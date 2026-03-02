@@ -2,6 +2,7 @@ import { isPlaywrightCatalogItem, RouteId } from "@shared";
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { hasPermission } from "@/auth";
+import mcpClient from "@/clients/mcp-client";
 import logger from "@/logging";
 import { McpServerRuntimeManager } from "@/mcp-server-runtime";
 import {
@@ -328,6 +329,17 @@ const mcpServerRoutes: FastifyPluginAsyncZod = async (fastify) => {
 
       // For LOCAL servers: validate env vars and create secrets (no connection validation, since deployment will be started later)
       if (catalogItem?.serverType === "local") {
+        // OAuth requires streamable-http transport — tokens can't be passed to stdio servers
+        if (
+          catalogItem.oauthConfig &&
+          catalogItem.localConfig?.transportType !== "streamable-http"
+        ) {
+          throw new ApiError(
+            400,
+            "OAuth authentication requires streamable-http transport. stdio servers cannot receive OAuth tokens.",
+          );
+        }
+
         // Validate required environment variables
         if (catalogItem.localConfig?.environment) {
           const requiredEnvVars = catalogItem.localConfig.environment.filter(
@@ -469,6 +481,46 @@ const mcpServerRoutes: FastifyPluginAsyncZod = async (fastify) => {
             );
             secretId = secret.id;
             createdSecretId = secret.id;
+          }
+        }
+
+        // When secretId comes from OAuth and catalog has secret-type env vars,
+        // merge env var values into the existing OAuth secret so both coexist
+        if (
+          secretId &&
+          !createdSecretId &&
+          catalogItem.localConfig?.environment
+        ) {
+          const secretEnvVars: Record<string, string> = {};
+          for (const envDef of catalogItem.localConfig.environment) {
+            if (envDef.type === "secret") {
+              const value = envDef.promptOnInstallation
+                ? environmentValues?.[envDef.key]
+                : envDef.value;
+              if (value) {
+                secretEnvVars[envDef.key] = value;
+              }
+            }
+          }
+
+          if (Object.keys(secretEnvVars).length > 0) {
+            const existingSecret = await secretManager().getSecret(secretId);
+            if (
+              existingSecret?.secret &&
+              typeof existingSecret.secret === "object"
+            ) {
+              await secretManager().updateSecret(secretId, {
+                ...(existingSecret.secret as Record<string, string>),
+                ...secretEnvVars,
+              });
+              logger.info(
+                {
+                  secretId,
+                  envVarCount: Object.keys(secretEnvVars).length,
+                },
+                "Merged environment variables into existing OAuth secret for local server",
+              );
+            }
           }
         }
       }
@@ -770,6 +822,47 @@ const mcpServerRoutes: FastifyPluginAsyncZod = async (fastify) => {
         }
       }
 
+      // For local servers, preserve env var values from old secret before deleting it
+      let preservedEnvVars: Record<string, string> | undefined;
+      if (mcpServer.serverType === "local" && mcpServer.secretId) {
+        const catalogItem = mcpServer.catalogId
+          ? await InternalMcpCatalogModel.findById(mcpServer.catalogId)
+          : null;
+        if (catalogItem?.localConfig?.environment) {
+          try {
+            const oldSecret = await secretManager().getSecret(
+              mcpServer.secretId,
+            );
+            if (oldSecret?.secret && typeof oldSecret.secret === "object") {
+              const oldSecretData = oldSecret.secret as Record<string, unknown>;
+              // Extract env var keys defined in the catalog
+              const envKeys = new Set(
+                catalogItem.localConfig.environment
+                  .filter((env) => env.type === "secret")
+                  .map((env) => env.key),
+              );
+              preservedEnvVars = {};
+              for (const key of envKeys) {
+                if (
+                  key in oldSecretData &&
+                  typeof oldSecretData[key] === "string"
+                ) {
+                  preservedEnvVars[key] = oldSecretData[key] as string;
+                }
+              }
+              if (Object.keys(preservedEnvVars).length === 0) {
+                preservedEnvVars = undefined;
+              }
+            }
+          } catch (error) {
+            logger.warn(
+              { err: error, mcpServerId: id },
+              "Failed to read old secret for env var preservation during re-auth",
+            );
+          }
+        }
+      }
+
       // Delete the old secret if it exists
       if (mcpServer.secretId) {
         try {
@@ -787,6 +880,31 @@ const mcpServerRoutes: FastifyPluginAsyncZod = async (fastify) => {
         }
       }
 
+      // Merge preserved env vars into the new OAuth secret
+      if (preservedEnvVars) {
+        try {
+          const newSecret = await secretManager().getSecret(secretId);
+          if (newSecret?.secret && typeof newSecret.secret === "object") {
+            await secretManager().updateSecret(secretId, {
+              ...(newSecret.secret as Record<string, string>),
+              ...preservedEnvVars,
+            });
+            logger.info(
+              {
+                mcpServerId: id,
+                envVarCount: Object.keys(preservedEnvVars).length,
+              },
+              "Merged preserved env vars into new OAuth secret during re-auth",
+            );
+          }
+        } catch (error) {
+          logger.error(
+            { err: error, mcpServerId: id },
+            "Failed to merge env vars into new secret during re-auth",
+          );
+        }
+      }
+
       // Update the server with new secret and clear OAuth error fields
       const updatedServer = await McpServerModel.update(id, {
         secretId,
@@ -798,10 +916,30 @@ const mcpServerRoutes: FastifyPluginAsyncZod = async (fastify) => {
         throw new ApiError(500, "Failed to update MCP server");
       }
 
+      // Clear the MCP client's secrets cache so next tool call uses fresh credentials
+      mcpClient.clearSecretsCache(id);
+
       logger.info(
         { mcpServerId: id, newSecretId: secretId },
         "MCP server re-authenticated successfully",
       );
+
+      // For local servers, restart the deployment so the K8s Secret is updated
+      if (mcpServer.serverType === "local") {
+        try {
+          await McpServerRuntimeManager.restartServer(id);
+          logger.info(
+            { mcpServerId: id },
+            "Restarted local server deployment after re-authentication",
+          );
+        } catch (error) {
+          logger.error(
+            { err: error, mcpServerId: id },
+            "Failed to restart local server after re-authentication",
+          );
+          // Don't fail the re-auth — the secret is updated, pod can be restarted manually
+        }
+      }
 
       return reply.send(updatedServer);
     },

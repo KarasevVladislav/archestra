@@ -172,6 +172,14 @@ class McpClient {
   private static readonly SECRETS_CACHE_TTL_MS = 30_000;
 
   /**
+   * Clear the cached secrets for a specific MCP server so the next tool call
+   * fetches fresh credentials from the database. Used after re-authentication.
+   */
+  clearSecretsCache(mcpServerId: string): void {
+    this.secretsCache.delete(mcpServerId);
+  }
+
+  /**
    * Close a cached session for a specific (catalogId, targetMcpServerId, agentId, conversationId).
    * Should be called when a subagent finishes to free the browser context.
    */

@@ -88,22 +88,44 @@ function OAuthCallbackContent() {
           // Get teamId from session storage (stored before OAuth redirect)
           const teamId = sessionStorage.getItem("oauth_team_id");
 
+          // Read local server env vars from sessionStorage (stored by handleLocalServerInstallConfirm)
+          const isLocalServer =
+            sessionStorage.getItem("oauth_local_server") === "true";
+          const envValuesRaw = sessionStorage.getItem("oauth_local_env_values");
+          const environmentValues = envValuesRaw
+            ? (JSON.parse(envValuesRaw) as Record<string, string>)
+            : undefined;
+          const isByosVault =
+            sessionStorage.getItem("oauth_local_is_byos_vault") === "true" ||
+            undefined;
+          const serviceAccount =
+            sessionStorage.getItem("oauth_local_service_account") || undefined;
+
           // Install the MCP server with the secret reference
           await installMutation.mutateAsync({
             name,
             catalogId,
             secretId,
             teamId: teamId || undefined,
+            ...(environmentValues && { environmentValues }),
+            ...(isByosVault && { isByosVault }),
+            ...(serviceAccount && { serviceAccount }),
+            // For local servers, suppress toast — the polling mechanism shows toast on completion
+            ...(isLocalServer && { dontShowToast: true }),
           });
 
           // Check if this was a first installation
           const isFirstInstallation =
             sessionStorage.getItem("oauth_is_first_installation") === "true";
 
-          // Clean up the processing flag and teamId after successful installation
+          // Clean up all oauth sessionStorage keys after successful installation
           sessionStorage.removeItem(processKey);
           sessionStorage.removeItem("oauth_team_id");
           sessionStorage.removeItem("oauth_is_first_installation");
+          sessionStorage.removeItem("oauth_local_server");
+          sessionStorage.removeItem("oauth_local_env_values");
+          sessionStorage.removeItem("oauth_local_is_byos_vault");
+          sessionStorage.removeItem("oauth_local_service_account");
 
           // Store flag to open assignments dialog after redirect (only for first installation)
           if (isFirstInstallation) {

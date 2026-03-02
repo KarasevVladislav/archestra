@@ -290,6 +290,22 @@ export function InternalMCPCatalog({
   };
 
   const handleInstallLocalServer = async (catalogItem: CatalogItem) => {
+    // If catalog item has OAuth config, check if we need env vars first
+    if (catalogItem.oauthConfig) {
+      const promptedEnvVars =
+        catalogItem.localConfig?.environment?.filter(
+          (env) => env.promptOnInstallation === true,
+        ) || [];
+
+      if (promptedEnvVars.length === 0) {
+        // No env vars to collect — go straight to OAuth dialog
+        setSelectedCatalogItem(catalogItem);
+        openDialog("oauth");
+        return;
+      }
+      // Has env vars — show local install dialog first, then OAuth after
+    }
+
     setLocalServerCatalogItem(catalogItem);
     openDialog("local-install");
   };
@@ -380,6 +396,36 @@ export function InternalMCPCatalog({
     }
 
     // New installation flow
+
+    // If this catalog item has OAuth config, store env values in sessionStorage
+    // and redirect to OAuth flow instead of installing directly
+    if (localServerCatalogItem.oauthConfig) {
+      // Store env values for use after OAuth callback
+      sessionStorage.setItem(
+        "oauth_local_env_values",
+        JSON.stringify(installResult.environmentValues),
+      );
+      if (installResult.isByosVault) {
+        sessionStorage.setItem("oauth_local_is_byos_vault", "true");
+      }
+      if (installResult.serviceAccount) {
+        sessionStorage.setItem(
+          "oauth_local_service_account",
+          installResult.serviceAccount,
+        );
+      }
+      if (installResult.teamId) {
+        sessionStorage.setItem("oauth_team_id", installResult.teamId);
+      }
+
+      // Close local install dialog and open OAuth dialog
+      closeDialog("local-install");
+      setLocalServerCatalogItem(null);
+      setSelectedCatalogItem(localServerCatalogItem);
+      openDialog("oauth");
+      return;
+    }
+
     // Check if this is the first installation for this catalog item
     const isFirstInstallation = !installedServers?.some(
       (s) => s.catalogId === localServerCatalogItem.id,
@@ -464,10 +510,20 @@ export function InternalMCPCatalog({
       // Store state in session storage for the callback
       sessionStorage.setItem("oauth_state", state);
       sessionStorage.setItem("oauth_catalog_id", selectedCatalogItem.id);
+
+      // For local servers, store a flag so the callback knows to pass env vars and suppress toast
+      if (selectedCatalogItem.serverType === "local") {
+        sessionStorage.setItem("oauth_local_server", "true");
+      } else {
+        sessionStorage.removeItem("oauth_local_server");
+      }
+
       // Store teamId for use after OAuth callback
+      // If coming from env-then-oauth flow, teamId was already stored in sessionStorage
+      // by handleLocalServerInstallConfirm — only overwrite if the OAuth dialog provides one
       if (result.teamId) {
         sessionStorage.setItem("oauth_team_id", result.teamId);
-      } else {
+      } else if (!sessionStorage.getItem("oauth_team_id")) {
         sessionStorage.removeItem("oauth_team_id");
       }
 
