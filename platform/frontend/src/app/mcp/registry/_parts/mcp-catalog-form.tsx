@@ -72,10 +72,13 @@ export function McpCatalogForm({
   serverType = "remote",
   footer,
 }: McpCatalogFormProps) {
-  // Fetch local config secret if it exists
-  const { data: localConfigSecret } = useGetSecret(
-    initialValues?.localConfigSecretId ?? null,
-  );
+  // Check if BYOS feature is available (enterprise license)
+  const showByosOption = useFeatureFlag("byosEnabled");
+  // Fetch local config secret if it exists (only needed for BYOS vault references)
+  const { data: localConfigSecret } = useGetSecret({
+    secretId: initialValues?.localConfigSecretId ?? null,
+    enabled: showByosOption,
+  });
 
   // Get MCP server base image from backend features endpoint
   const mcpServerBaseImage = useFeatureValue("mcpServerBaseImage") ?? "";
@@ -132,9 +135,6 @@ export function McpCatalogForm({
   );
   const [labelsOpen, setLabelsOpen] = useState(false);
   const labelsRef = useRef<ProfileLabelsRef>(null);
-
-  // Check if BYOS feature is available (enterprise license)
-  const showByosOption = useFeatureFlag("byosEnabled");
 
   // Use field array for environment variables
   const { fields, append, remove } = useFieldArray({
