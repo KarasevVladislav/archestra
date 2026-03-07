@@ -7,6 +7,7 @@ use tokio::sync::Mutex;
 #[derive(Debug, Serialize)]
 pub struct UpdateInfo {
     pub update_available: bool,
+    pub container_outdated: bool,
     pub current_digest: Option<String>,
     pub remote_digest: Option<String>,
     pub current_image: String,
@@ -93,8 +94,42 @@ pub async fn check_for_updates(
         _ => false,
     };
 
+    // Check if running container uses a different image than local latest
+    let container_name = &state.container_config.container_name;
+    let container_outdated = {
+        let container_image_id = Command::new("docker")
+            .args(["inspect", "--format", "{{.Image}}", container_name])
+            .output()
+            .await
+            .ok()
+            .and_then(|o| {
+                if o.status.success() {
+                    Some(String::from_utf8_lossy(&o.stdout).trim().to_string())
+                } else {
+                    None
+                }
+            });
+        let local_image_id = Command::new("docker")
+            .args(["inspect", "--format", "{{.Id}}", image])
+            .output()
+            .await
+            .ok()
+            .and_then(|o| {
+                if o.status.success() {
+                    Some(String::from_utf8_lossy(&o.stdout).trim().to_string())
+                } else {
+                    None
+                }
+            });
+        match (container_image_id, local_image_id) {
+            (Some(c), Some(l)) => c != l,
+            _ => false,
+        }
+    };
+
     Ok(UpdateInfo {
         update_available,
+        container_outdated,
         current_digest: local_digest,
         remote_digest,
         current_image: image.clone(),

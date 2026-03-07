@@ -23,9 +23,10 @@ pub struct ClusterInfo {
 }
 
 async fn kubectl_in_container(container_name: &str, args: &[&str]) -> Result<String, String> {
+    // kubectl lives in the KinD control plane container, not the main archestra container
+    let control_plane = format!("{}-mcp-control-plane", container_name);
     let kubectl_args: Vec<String> = std::iter::once("exec".to_string())
-        .chain(std::iter::once(container_name.to_string()))
-        .chain(std::iter::once("--".to_string()))
+        .chain(std::iter::once(control_plane))
         .chain(std::iter::once("kubectl".to_string()))
         .chain(args.iter().map(|s| s.to_string()))
         .collect();
@@ -58,6 +59,8 @@ pub async fn list_pods(container_name: String) -> Result<Vec<PodInfo>, String> {
         &[
             "get",
             "pods",
+            "-n",
+            "default",
             "-o",
             "jsonpath={range .items[*]}{.metadata.name}|{.status.phase}|{.status.containerStatuses[0].restartCount}|{.metadata.creationTimestamp}|{.spec.containers[0].image}{\"\\n\"}{end}",
         ],

@@ -57,37 +57,7 @@
   },
   "plugins": {
     "shell": {
-      "open": true,
-      "scope": [
-        {
-          "name": "docker",
-          "cmd": "docker",
-          "args": true
-        },
-        {
-          "name": "colima",
-          "cmd": "colima",
-          "args": true
-        },
-        {
-          "name": "lima",
-          "cmd": "limactl",
-          "args": true
-        },
-        {
-          "name": "wsl",
-          "cmd": "wsl",
-          "args": true
-        },
-        {
-          "name": "open-browser",
-          "cmd": "open",
-          "args": true
-        }
-      ]
-    },
-    "notification": {
-      "all": true
+      "open": true
     }
   }
 }

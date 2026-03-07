@@ -116,10 +116,10 @@ First build takes 3-8 minutes. Subsequent builds take 30-90 seconds.
 
 | Platform | Format | Path | Typical Size |
 |----------|--------|------|-------------|
-| macOS | `.dmg` | `target/release/bundle/dmg/Archestra_0.1.0_*.dmg` | 8-15 MB |
-| Windows | `.msi` | `target/release/bundle/msi/Archestra_0.1.0_*.msi` | 5-10 MB |
-| Linux | `.AppImage` | `target/release/bundle/appimage/Archestra_0.1.0_*.AppImage` | 10-18 MB |
-| Linux | `.deb` | `target/release/bundle/deb/archestra-desktop_0.1.0_*.deb` | 4-8 MB |
+| macOS | `.dmg` | `src-tauri/target/release/bundle/dmg/Archestra_0.1.0_*.dmg` | 8-15 MB |
+| Windows | `.msi` | `src-tauri/target/release/bundle/msi/Archestra_0.1.0_*.msi` | 5-10 MB |
+| Linux | `.AppImage` | `src-tauri/target/release/bundle/appimage/Archestra_0.1.0_*.AppImage` | 10-18 MB |
+| Linux | `.deb` | `src-tauri/target/release/bundle/deb/archestra-desktop_0.1.0_*.deb` | 4-8 MB |
 
 ### Cross-platform builds
 
@@ -138,11 +138,11 @@ Currently unsigned. Users will see OS warnings:
 
 ```
 desktop/
-├── Cargo.toml                  # Rust dependencies (tauri, tokio, reqwest, serde, etc.)
-├── build.rs                    # Tauri build script (required by Tauri)
 ├── .gitignore                  # Ignores target/, gen/, .DS_Store
 │
 ├── src-tauri/
+│   ├── Cargo.toml              # Rust dependencies (tauri, tokio, reqwest, serde, etc.)
+│   ├── build.rs                # Tauri build script (required by Tauri)
 │   ├── tauri.conf.json         # App config: window size, ports, bundle settings, plugin permissions
 │   ├── capabilities/
 │   │   └── default.json        # WebView permission grants (shell, notifications)

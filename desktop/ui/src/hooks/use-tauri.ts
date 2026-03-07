@@ -20,6 +20,7 @@ export function useTauri() {
     startContainer: () => invoke<ContainerStatus>("start_container"),
     stopContainer: () => invoke<void>("stop_container"),
     restartContainer: () => invoke<void>("restart_container"),
+    recreateContainer: () => invoke<ContainerStatus>("recreate_container"),
 
     getContainerConfig: () => invoke<ContainerConfig>("get_container_config"),
     setContainerConfig: (config: ContainerConfig) =>

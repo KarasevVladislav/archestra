@@ -39,6 +39,8 @@ export function HomeTab({ config, onUpdateAvailable }: HomeTabProps) {
   const [containerLoading, setContainerLoading] = useState<string | null>(null);
   const [updateLoading, setUpdateLoading] = useState(false);
   const [pullLoading, setPullLoading] = useState(false);
+  const [showRecreateBtn, setShowRecreateBtn] = useState(false);
+  const [recreateLoading, setRecreateLoading] = useState(false);
 
   const containerRunning = container?.status === "Running";
 
@@ -124,10 +126,18 @@ export function HomeTab({ config, onUpdateAvailable }: HomeTabProps) {
       if (info.update_available) {
         setImageStatus("starting");
         setShowPullBtn(true);
+        setShowRecreateBtn(false);
         setImageSub(`Update available! Last updated: ${info.last_updated || "unknown"}`);
         onUpdateAvailable();
+      } else if (info.container_outdated) {
+        setImageStatus("starting");
+        setShowPullBtn(false);
+        setShowRecreateBtn(true);
+        setImageSub("Image is up to date, but container needs to be recreated");
       } else {
         setImageStatus("running");
+        setShowPullBtn(false);
+        setShowRecreateBtn(false);
         setImageSub("Up to date");
       }
     } catch (e) { alert("Failed to check updates: " + e); }
@@ -140,16 +150,44 @@ export function HomeTab({ config, onUpdateAvailable }: HomeTabProps) {
       await api.pullLatestImage();
       setImageStatus("running");
       setShowPullBtn(false);
+      setShowRecreateBtn(false);
       const img = await api.getCurrentImageInfo();
       setImageInfo(img);
       setImageSub(`Size: ${img.size} | ID: ${img.image_id}`);
-      alert("Image updated! Restart the container to use the new version.");
-    } catch (e) { alert("Failed to pull image: " + e); }
+      // Recreate container from the new image
+      setContainerLoading("Recreating...");
+      await api.recreateContainer();
+      await refreshContainer();
+      setContainerLoading(null);
+    } catch (e) { alert("Failed to pull/update: " + e); }
     setPullLoading(false);
   }
 
-  function openUrl(port: number) {
-    if (containerRunning) window.open(`http://localhost:${port}`, "_blank");
+  async function handleRecreateContainer() {
+    setRecreateLoading(true);
+    try {
+      await api.recreateContainer();
+      await refreshContainer();
+      setShowRecreateBtn(false);
+      setImageStatus("running");
+      setImageSub("Up to date");
+    } catch (e) { alert("Failed to recreate container: " + e); }
+    setRecreateLoading(false);
+  }
+
+  async function openUrl(port: number) {
+    if (!containerRunning) return;
+    await openFullUrl(`http://localhost:${port}`);
+  }
+
+  async function openFullUrl(url: string) {
+    if (!containerRunning) return;
+    try {
+      const { open } = await import("@tauri-apps/plugin-shell");
+      await open(url);
+    } catch {
+      window.open(url, "_blank");
+    }
   }
 
   const fp = config?.frontend_port || 3000;
@@ -207,6 +245,11 @@ export function HomeTab({ config, onUpdateAvailable }: HomeTabProps) {
               {pullLoading ? "Pulling..." : "Pull Update"}
             </Button>
           )}
+          {showRecreateBtn && (
+            <Button size="sm" disabled={recreateLoading} onClick={handleRecreateContainer}>
+              {recreateLoading ? "Recreating..." : "Recreate Container"}
+            </Button>
+          )}
         </StatusCard>
 
         <StatusCard title="Cluster" status={clusterStatus} value={clusterName} sub={clusterPods} />
@@ -217,15 +260,15 @@ export function HomeTab({ config, onUpdateAvailable }: HomeTabProps) {
         <h3 className="text-sm font-semibold mb-3 text-muted-foreground">Quick Links</h3>
         <div className="flex gap-3 flex-wrap">
           {[
-            { label: "Frontend", port: fp, icon: Monitor },
-            { label: "Backend API", port: bp, icon: Server },
-            { label: "Drizzle Studio", port: dp, icon: Database },
+            { label: "Frontend", port: fp, url: `http://localhost:${fp}`, icon: Monitor },
+            { label: "Backend API", port: bp, url: `http://localhost:${bp}`, icon: Server },
+            { label: "Drizzle Studio", port: dp, url: `https://local.drizzle.studio?port=${dp}`, icon: Database },
           ].map((link) => {
             const Icon = link.icon;
             return (
               <Card
                 key={link.label}
-                onClick={() => openUrl(link.port)}
+                onClick={() => openFullUrl(link.url)}
                 className={`flex flex-row items-center gap-2.5 px-4 py-3 cursor-pointer transition-colors ${
                   containerRunning ? "hover:border-primary hover:bg-accent" : "opacity-40 cursor-not-allowed"
                 }`}

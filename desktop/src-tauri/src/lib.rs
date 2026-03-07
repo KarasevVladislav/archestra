@@ -32,6 +32,7 @@ pub fn run() {
             container::start_container,
             container::stop_container,
             container::restart_container,
+            container::recreate_container,
             container::get_container_config,
             container::set_container_config,
             // Logs

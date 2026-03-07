@@ -50,7 +50,15 @@ export function DatabaseTab({ config, containerRunning }: DatabaseTabProps) {
               : drizzleRunning ? "Disable Drizzle Studio" : "Enable Drizzle Studio"}
           </Button>
           {drizzleRunning && (
-            <Button variant="outline" size="sm" onClick={() => window.open(`http://localhost:${config?.drizzle_studio_port || 4983}`, "_blank")}>
+            <Button variant="outline" size="sm" onClick={async () => {
+              const url = `https://local.drizzle.studio?port=${config?.drizzle_studio_port || 4983}`;
+              try {
+                const { open } = await import("@tauri-apps/plugin-shell");
+                await open(url);
+              } catch {
+                window.open(url, "_blank");
+              }
+            }}>
               Open in Browser
             </Button>
           )}

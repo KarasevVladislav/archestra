@@ -47,6 +47,7 @@ export interface ClusterInfo {
 
 export interface UpdateInfo {
   update_available: boolean;
+  container_outdated: boolean;
   last_updated: string | null;
 }
 
