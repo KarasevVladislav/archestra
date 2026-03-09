@@ -79,7 +79,8 @@ function OAuthCallbackContent() {
           await reauthMutation.mutateAsync({
             id: mcpServerId,
             secretId,
-            name,
+            slug: name,
+            displayName: name,
           });
 
           clearCallbackProcessing(code, state);

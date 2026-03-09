@@ -34,7 +34,7 @@ export const ExtendedSelectToolSchema = SelectToolSchema.omit({
   catalog: z
     .object({
       id: z.string(),
-      name: z.string(),
+      slug: z.string(),
     })
     .nullable(),
 });

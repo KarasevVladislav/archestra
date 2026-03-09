@@ -637,7 +637,7 @@ const oauthRoutes: FastifyPluginAsyncZod = async (fastify) => {
             "Attempting dynamic client registration",
           );
           registrationResult = await registerOAuthClient(registrationEndpoint, {
-            client_name: `Archestra Platform - ${catalogItem.name}`,
+            client_name: `Archestra Platform - ${catalogItem.displayName}`,
             redirect_uris: [redirectUri],
             grant_types: ["authorization_code", "refresh_token"],
             response_types: ["code"],
@@ -913,14 +913,14 @@ const oauthRoutes: FastifyPluginAsyncZod = async (fastify) => {
 
       const secret = await secretManager().createSecret(
         secretPayload,
-        `${catalogItem.name}-oauth`,
+        `${catalogItem.slug}-oauth`,
         isByosEnabled(), // forceDB: store in DB when BYOS is enabled
       );
 
       return reply.send({
         success: true,
         catalogId: oauthState.catalogId,
-        name: catalogItem.name,
+        name: catalogItem.slug,
         accessToken: tokenData.access_token,
         // Only include optional fields if they have truthy values (avoid null which fails schema validation)
         ...(tokenData.refresh_token && {

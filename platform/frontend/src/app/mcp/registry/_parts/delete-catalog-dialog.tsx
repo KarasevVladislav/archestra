@@ -47,7 +47,7 @@ export function DeleteCatalogDialog({
               (() => {
                 return installationCount > 0 ? (
                   <div className="space-y-3">
-                    <ConfirmationContent name={item.name} />
+                    <ConfirmationContent name={item.displayName} />
                     <div className="text-sm">
                       There are currently <strong>{installationCount}</strong>{" "}
                       installation(s) of this server. Deleting this catalog
@@ -55,7 +55,7 @@ export function DeleteCatalogDialog({
                     </div>
                   </div>
                 ) : (
-                  <ConfirmationContent name={item.name} />
+                  <ConfirmationContent name={item.displayName} />
                 );
               })()}
           </DialogDescription>

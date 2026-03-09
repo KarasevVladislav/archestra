@@ -427,7 +427,7 @@ export function InternalMCPCatalog({
   const handleInstallPlaywright = async (catalogItem: CatalogItem) => {
     setInstallingItemId(catalogItem.id);
     const result = await installMutation.mutateAsync({
-      name: catalogItem.name,
+      name: catalogItem.slug,
       catalogId: catalogItem.id,
       dontShowToast: true,
     });
@@ -471,7 +471,7 @@ export function InternalMCPCatalog({
   ) => {
     setInstallingItemId(catalogItem.id);
     const result = await installMutation.mutateAsync({
-      name: catalogItem.name,
+      name: catalogItem.slug,
       catalogId: catalogItem.id,
       ...(teamId && { teamId }),
       dontShowToast: true,
@@ -530,7 +530,7 @@ export function InternalMCPCatalog({
 
     setInstallingItemId(catalogItem.id);
     await installMutation.mutateAsync({
-      name: catalogItem.name,
+      name: catalogItem.slug,
       catalogId: catalogItem.id,
       teamId: result.teamId ?? undefined,
     });
@@ -585,7 +585,8 @@ export function InternalMCPCatalog({
     if (reauthServerId) {
       await reauthMutation.mutateAsync({
         id: reauthServerId,
-        name: localServerCatalogItem.name,
+        slug: localServerCatalogItem.slug,
+        displayName: localServerCatalogItem.displayName,
         environmentValues: installResult.environmentValues,
         isByosVault: installResult.isByosVault,
       });
@@ -610,7 +611,8 @@ export function InternalMCPCatalog({
       try {
         await reinstallMutation.mutateAsync({
           id: serverIdToReinstall,
-          name: localServerCatalogItem.name,
+          slug: localServerCatalogItem.slug,
+          displayName: localServerCatalogItem.displayName,
           environmentValues: installResult.environmentValues,
           isByosVault: installResult.isByosVault,
           serviceAccount: installResult.serviceAccount,
@@ -635,7 +637,7 @@ export function InternalMCPCatalog({
 
     setInstallingItemId(localServerCatalogItem.id);
     const result = await installMutation.mutateAsync({
-      name: localServerCatalogItem.name,
+      name: localServerCatalogItem.slug,
       catalogId: localServerCatalogItem.id,
       environmentValues: installResult.environmentValues,
       isByosVault: installResult.isByosVault,
@@ -678,7 +680,8 @@ export function InternalMCPCatalog({
     if (reauthServerId) {
       await reauthMutation.mutateAsync({
         id: reauthServerId,
-        name: catalogItem.name,
+        slug: catalogItem.slug,
+        displayName: catalogItem.displayName,
         ...(accessToken && { accessToken }),
         ...(result.isByosVault && {
           userConfigValues: result.metadata as Record<string, string>,
@@ -700,7 +703,7 @@ export function InternalMCPCatalog({
     setInstallingItemId(catalogItem.id);
 
     await installMutation.mutateAsync({
-      name: catalogItem.name,
+      name: catalogItem.slug,
       catalogId: catalogItem.id,
       ...(accessToken && { accessToken }),
       ...(result.isByosVault && {
@@ -852,7 +855,8 @@ export function InternalMCPCatalog({
         try {
           await reinstallMutation.mutateAsync({
             id: installedServer.id,
-            name: catalogItem.name,
+            slug: catalogItem.slug,
+            displayName: catalogItem.displayName,
           });
         } finally {
           // Clear installing state whether success or error
@@ -895,7 +899,8 @@ export function InternalMCPCatalog({
     try {
       await reinstallMutation.mutateAsync({
         id: installedServer.id,
-        name: catalogItemForReinstall.name,
+        slug: catalogItemForReinstall.slug,
+        displayName: catalogItemForReinstall.displayName,
       });
     } finally {
       // Clear installing state whether success or error
@@ -958,11 +963,9 @@ export function InternalMCPCatalog({
     if (!normalizedQuery) return items;
 
     return items.filter((item) => {
-      const labelText =
-        typeof item.name === "string" ? item.name.toLowerCase() : "";
       return (
-        item.name.toLowerCase().includes(normalizedQuery) ||
-        labelText.includes(normalizedQuery)
+        item.slug.toLowerCase().includes(normalizedQuery) ||
+        item.displayName.toLowerCase().includes(normalizedQuery)
       );
     });
   };
@@ -1053,7 +1056,7 @@ export function InternalMCPCatalog({
                     onReinstall={() => handleReinstall(item)}
                     onEdit={() => setEditingItem(item)}
                     onDetails={() => {
-                      setDetailsServerName(item.name);
+                      setDetailsServerName(item.slug);
                     }}
                     onDelete={() => setDeletingItem(item)}
                     onCancelInstallation={handleCancelInstallation}
@@ -1110,7 +1113,7 @@ export function InternalMCPCatalog({
                     onReinstall={() => handleReinstall(item)}
                     onEdit={() => setEditingItem(item)}
                     onDetails={() => {
-                      setDetailsServerName(item.name);
+                      setDetailsServerName(item.slug);
                     }}
                     onDelete={() => setDeletingItem(item)}
                     onCancelInstallation={handleCancelInstallation}
@@ -1223,7 +1226,7 @@ export function InternalMCPCatalog({
             closeDialog("oauth");
           }
         }}
-        serverName={selectedCatalogItem?.name || ""}
+        serverName={selectedCatalogItem?.displayName || ""}
         onConfirm={handleOAuthConfirm}
         onCancel={() => {
           closeDialog("oauth");
@@ -1245,7 +1248,7 @@ export function InternalMCPCatalog({
         }}
         isRemoteServer={catalogItemForReinstall?.serverType === "remote"}
         onConfirm={handleReinstallConfirm}
-        serverName={catalogItemForReinstall?.name || ""}
+        serverName={catalogItemForReinstall?.displayName || ""}
         isReinstalling={reinstallMutation.isPending}
       />
 

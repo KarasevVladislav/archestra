@@ -501,11 +501,13 @@ export function AssignedToolsTable({
                       variant="default"
                       className="bg-indigo-500 max-w-[150px]"
                     >
-                      <span className="truncate">{catalogItem.name}</span>
+                      <span className="truncate">
+                        {catalogItem.displayName}
+                      </span>
                     </Badge>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>{catalogItem.name}</p>
+                    <p>{catalogItem.displayName}</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -739,7 +741,7 @@ export function AssignedToolsTable({
   const uniqueOrigins = useMemo(() => {
     const origins = new Set<{ id: string; name: string }>();
     internalMcpCatalogItems?.forEach((item) => {
-      origins.add({ id: item.id, name: item.name });
+      origins.add({ id: item.id, name: item.displayName });
     });
     return Array.from(origins);
   }, [internalMcpCatalogItems]);

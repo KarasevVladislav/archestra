@@ -350,7 +350,8 @@ const deleteTrustedDataPolicy = async (
 const createMcpCatalogItem = async (
   request: APIRequestContext,
   catalogItem: {
-    name: string;
+    slug: string;
+    displayName: string;
     description: string;
     serverType: "local" | "remote";
     localConfig?: unknown;

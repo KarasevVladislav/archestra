@@ -170,8 +170,8 @@ function McpToolCallsTable({
     const map = new Map<string, string>();
     if (mcpServers) {
       for (const server of mcpServers) {
-        if (server.catalogName) {
-          map.set(server.name, server.catalogName);
+        if (server.catalogSlug) {
+          map.set(server.name, server.catalogSlug);
         }
       }
     }

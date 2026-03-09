@@ -66,7 +66,7 @@ export function NoAuthInstallDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Building2 className="h-5 w-5" />
-            <span>Install {catalogItem.name}</span>
+            <span>Install {catalogItem.displayName}</span>
           </DialogTitle>
           <DialogDescription>
             This MCP server doesn't require authentication. Click Install to

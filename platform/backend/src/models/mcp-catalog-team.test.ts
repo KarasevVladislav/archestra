@@ -235,19 +235,22 @@ test("findAll with scope filtering returns correct items", async ({
   const orgCatalog = await makeInternalMcpCatalog({
     scope: "org",
     organizationId: org.id,
-    name: "scope-test-org",
+    slug: "scope-test-org",
+    displayName: "scope-test-org",
   });
   const personalCatalog = await makeInternalMcpCatalog({
     scope: "personal",
     organizationId: org.id,
     authorId: author.id,
-    name: "scope-test-personal",
+    slug: "scope-test-personal",
+    displayName: "scope-test-personal",
   });
   const teamCatalog = await makeInternalMcpCatalog({
     scope: "team",
     organizationId: org.id,
     teams: [team.id],
-    name: "scope-test-team",
+    slug: "scope-test-team",
+    displayName: "scope-test-team",
   });
 
   // Author can see all 3
@@ -256,10 +259,10 @@ test("findAll with scope filtering returns correct items", async ({
     userId: author.id,
     isAdmin: false,
   });
-  const authorNames = authorItems.map((i) => i.name);
-  expect(authorNames).toContain(orgCatalog.name);
-  expect(authorNames).toContain(personalCatalog.name);
-  expect(authorNames).toContain(teamCatalog.name);
+  const authorSlugs = authorItems.map((i) => i.slug);
+  expect(authorSlugs).toContain(orgCatalog.slug);
+  expect(authorSlugs).toContain(personalCatalog.slug);
+  expect(authorSlugs).toContain(teamCatalog.slug);
 
   // Other user can only see org
   const otherItems = await InternalMcpCatalogModel.findAll({
@@ -267,8 +270,8 @@ test("findAll with scope filtering returns correct items", async ({
     userId: otherUser.id,
     isAdmin: false,
   });
-  const otherNames = otherItems.map((i) => i.name);
-  expect(otherNames).toContain(orgCatalog.name);
-  expect(otherNames).not.toContain(personalCatalog.name);
-  expect(otherNames).not.toContain(teamCatalog.name);
+  const otherSlugs = otherItems.map((i) => i.slug);
+  expect(otherSlugs).toContain(orgCatalog.slug);
+  expect(otherSlugs).not.toContain(personalCatalog.slug);
+  expect(otherSlugs).not.toContain(teamCatalog.slug);
 });

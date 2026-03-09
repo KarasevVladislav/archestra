@@ -103,7 +103,8 @@ test.describe("Image Pull Secrets", () => {
   }) => {
     // Create a catalog item with both "existing" and "credentials" image pull secrets
     const catalogResponse = await createMcpCatalogItem(request, {
-      name: `e2e-ips-test-${Date.now()}`,
+      slug: `e2e-ips-test-${Date.now()}`,
+      displayName: `e2e-ips-test-${Date.now()}`,
       description: "E2E test for image pull secrets",
       serverType: "local",
       localConfig: {

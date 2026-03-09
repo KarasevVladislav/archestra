@@ -259,7 +259,7 @@ export function McpServerSettingsDialog({
           showCloseButton={false}
         >
           <DialogTitle className="sr-only">
-            {item.label || item.name} Settings
+            {item.label || item.displayName} Settings
           </DialogTitle>
           <DialogDescription className="sr-only">
             Server settings and configuration
@@ -271,9 +271,9 @@ export function McpServerSettingsDialog({
               <div className="flex items-center gap-2.5">
                 <SidebarIcon icon={item.icon} catalogId={item.id} />
                 <div className="min-w-0 flex-1">
-                  <TruncatedTooltip content={item.label || item.name}>
+                  <TruncatedTooltip content={item.label || item.displayName}>
                     <div className="font-semibold text-sm truncate">
-                      {item.label || item.name}
+                      {item.label || item.displayName}
                     </div>
                   </TruncatedTooltip>
                   {summary && (
@@ -396,7 +396,7 @@ export function McpServerSettingsDialog({
                 <ManageUsersContent
                   isActive={open && validPage === "connections"}
                   onClose={handleClose}
-                  label={item.label || item.name}
+                  label={item.label || item.displayName}
                   catalogId={item.id}
                   onAddPersonalConnection={onAddPersonalConnection}
                   onAddSharedConnection={onAddSharedConnection}
@@ -419,7 +419,7 @@ export function McpServerSettingsDialog({
                   <div className="flex flex-col flex-1 min-h-0">
                     <McpLogsContent
                       isActive={open && isDebugPage}
-                      serverName={item.label || item.name}
+                      serverName={item.label || item.displayName}
                       installs={installs}
                       deploymentStatuses={deploymentStatuses}
                       hideHeader

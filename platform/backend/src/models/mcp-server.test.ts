@@ -10,19 +10,22 @@ describe("McpServerModel", () => {
     }) => {
       // Create catalogs for each server type
       const localCatalog = await makeInternalMcpCatalog({
-        name: "Local Test Catalog",
+        slug: "Local Test Catalog",
+        displayName: "Local Test Catalog",
         serverType: "local",
         localConfig: { command: "node", arguments: ["server.js"] },
       });
 
       const remoteCatalog = await makeInternalMcpCatalog({
-        name: "Remote Test Catalog",
+        slug: "Remote Test Catalog",
+        displayName: "Remote Test Catalog",
         serverType: "remote",
         serverUrl: "https://example.com/mcp",
       });
 
       const builtinCatalog = await makeInternalMcpCatalog({
-        name: "Builtin Test Catalog",
+        slug: "Builtin Test Catalog",
+        displayName: "Builtin Test Catalog",
         serverType: "builtin",
       });
 

@@ -108,7 +108,8 @@ export const InsertInternalMcpCatalogSchema = createInsertSchema(
   .extend({
     // Allow explicit ID for builtin catalog items (e.g., Archestra)
     id: z.string().uuid().optional(),
-    name: z.string().trim().min(1, "Name cannot be empty"),
+    slug: z.string().trim().min(1, "Slug cannot be empty"),
+    displayName: z.string().trim().min(1, "Display name cannot be empty"),
     serverType: InternalMcpCatalogServerTypeSchema,
     authFields: z.array(AuthFieldSchema).nullable().optional(),
     userConfig: z
@@ -133,7 +134,8 @@ export const UpdateInternalMcpCatalogSchema = createUpdateSchema(
   schema.internalMcpCatalogTable,
 )
   .extend({
-    name: z.string().trim().min(1, "Name cannot be empty"),
+    slug: z.string().trim().min(1, "Slug cannot be empty"),
+    displayName: z.string().trim().min(1, "Display name cannot be empty"),
     serverType: InternalMcpCatalogServerTypeSchema,
     authFields: z.array(AuthFieldSchema).nullable().optional(),
     userConfig: z

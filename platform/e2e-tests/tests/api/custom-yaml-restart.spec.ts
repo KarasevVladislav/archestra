@@ -29,7 +29,8 @@ test.describe("Custom YAML Spec - Server Restart on YAML Edit", () => {
     // STEP 1: Create catalog item (same config as internal-dev-test-server)
     // ========================================
     const catalogResponse = await createMcpCatalogItem(request, {
-      name: serverName,
+      slug: serverName,
+      displayName: serverName,
       description: "Test custom YAML restart",
       serverType: "local",
       localConfig: {

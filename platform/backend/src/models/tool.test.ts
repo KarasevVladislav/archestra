@@ -382,7 +382,8 @@ describe("ToolModel", () => {
       const agent = await makeAgent();
 
       const catalogItem = await makeInternalMcpCatalog({
-        name: "github-mcp-server",
+        slug: "github-mcp-server",
+        displayName: "github-mcp-server",
         serverUrl: "https://api.githubcopilot.com/mcp/",
       });
 
@@ -422,7 +423,7 @@ describe("ToolModel", () => {
         credentialSourceMcpServerId: null,
         executionSourceMcpServerId: null,
         catalogId: catalogItem.id,
-        catalogName: "github-mcp-server",
+        catalogSlug: "github-mcp-server",
         useDynamicTeamCredential: false,
       });
     });
@@ -438,7 +439,8 @@ describe("ToolModel", () => {
       const agent = await makeAgent();
 
       const catalogItem = await makeInternalMcpCatalog({
-        name: "github-mcp-server",
+        slug: "github-mcp-server",
+        displayName: "github-mcp-server",
         serverUrl: "https://api.githubcopilot.com/mcp/",
       });
 
@@ -491,7 +493,8 @@ describe("ToolModel", () => {
 
       // Create an MCP server and tool
       const catalogItem = await makeInternalMcpCatalog({
-        name: "github-mcp-server",
+        slug: "github-mcp-server",
+        displayName: "github-mcp-server",
         serverUrl: "https://api.githubcopilot.com/mcp/",
       });
       await makeMcpServer({
@@ -532,7 +535,8 @@ describe("ToolModel", () => {
 
       // Create an MCP server
       const catalogItem = await makeInternalMcpCatalog({
-        name: "github-mcp-server",
+        slug: "github-mcp-server",
+        displayName: "github-mcp-server",
         serverUrl: "https://api.githubcopilot.com/mcp/",
       });
       await makeMcpServer({
@@ -582,7 +586,8 @@ describe("ToolModel", () => {
 
       // Create two MCP servers
       const catalogItem = await makeInternalMcpCatalog({
-        name: "github-mcp-server",
+        slug: "github-mcp-server",
+        displayName: "github-mcp-server",
         serverUrl: "https://api.githubcopilot.com/mcp/",
       });
       await makeMcpServer({
@@ -592,7 +597,8 @@ describe("ToolModel", () => {
       });
 
       const catalogItem2 = await makeInternalMcpCatalog({
-        name: "other-mcp-server",
+        slug: "other-mcp-server",
+        displayName: "other-mcp-server",
         serverUrl: "https://api.othercopilot.com/mcp/",
       });
       await makeMcpServer({
@@ -687,7 +693,8 @@ describe("ToolModel", () => {
       const agent2 = await makeAgent({ name: "Agent 2" });
 
       const catalogItem = await makeInternalMcpCatalog({
-        name: "shared-catalog",
+        slug: "shared-catalog",
+        displayName: "shared-catalog",
         serverUrl: "https://api.shared.com/mcp/",
       });
 
@@ -748,7 +755,8 @@ describe("ToolModel", () => {
       makeInternalMcpCatalog,
     }) => {
       const catalogItem = await makeInternalMcpCatalog({
-        name: "empty-catalog",
+        slug: "empty-catalog",
+        displayName: "empty-catalog",
         serverUrl: "https://api.empty.com/mcp/",
       });
 
@@ -1031,8 +1039,14 @@ describe("ToolModel", () => {
       makeInternalMcpCatalog,
       makeTool,
     }) => {
-      const catalog1 = await makeInternalMcpCatalog({ name: "Catalog 1" });
-      const catalog2 = await makeInternalMcpCatalog({ name: "Catalog 2" });
+      const catalog1 = await makeInternalMcpCatalog({
+        slug: "catalog-1",
+        displayName: "Catalog 1",
+      });
+      const catalog2 = await makeInternalMcpCatalog({
+        slug: "catalog-2",
+        displayName: "Catalog 2",
+      });
 
       // Create a tool that already belongs to catalog1
       const existingTool = await makeTool({
@@ -1786,7 +1800,8 @@ describe("ToolModel", () => {
       makeAgent,
     }) => {
       const catalog = await makeInternalMcpCatalog({
-        name: "old-catalog-name",
+        slug: "old-catalog-name",
+        displayName: "old-catalog-name",
       });
       await makeMcpServer({ catalogId: catalog.id });
       const agent = await makeAgent();

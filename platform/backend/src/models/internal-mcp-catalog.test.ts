@@ -24,7 +24,8 @@ describe("InternalMcpCatalogModel", () => {
 
       // Create catalog item with secret references using the model directly
       const catalog = await InternalMcpCatalogModel.create({
-        name: "test-catalog-with-secrets",
+        slug: "test-catalog-with-secrets",
+        displayName: "test-catalog-with-secrets",
         serverType: "remote",
         clientSecretId: oauthSecret.id,
         localConfigSecretId: envSecret.id,
@@ -92,7 +93,8 @@ describe("InternalMcpCatalogModel", () => {
 
       // Create catalog item with secret references
       const catalog = await InternalMcpCatalogModel.create({
-        name: "test-catalog-no-expand",
+        slug: "test-catalog-no-expand",
+        displayName: "test-catalog-no-expand",
         serverType: "remote",
         clientSecretId: oauthSecret.id,
         localConfigSecretId: envSecret.id,
@@ -138,11 +140,13 @@ describe("InternalMcpCatalogModel", () => {
       makeInternalMcpCatalog,
     }) => {
       const catalog1 = await makeInternalMcpCatalog({
-        name: "test-catalog-1",
+        slug: "test-catalog-1",
+        displayName: "test-catalog-1",
         serverType: "remote",
       });
       const catalog2 = await makeInternalMcpCatalog({
-        name: "test-catalog-2",
+        slug: "test-catalog-2",
+        displayName: "test-catalog-2",
         serverType: "local",
       });
       const nonExistentId = "00000000-0000-0000-0000-000000000000";
@@ -162,13 +166,13 @@ describe("InternalMcpCatalogModel", () => {
       const item1 = catalogItemsMap.get(catalog1.id);
       expect(item1).toBeDefined();
       expect(item1?.id).toBe(catalog1.id);
-      expect(item1?.name).toBe("test-catalog-1");
+      expect(item1?.slug).toBe("test-catalog-1");
       expect(item1?.serverType).toBe("remote");
 
       const item2 = catalogItemsMap.get(catalog2.id);
       expect(item2).toBeDefined();
       expect(item2?.id).toBe(catalog2.id);
-      expect(item2?.name).toBe("test-catalog-2");
+      expect(item2?.slug).toBe("test-catalog-2");
       expect(item2?.serverType).toBe("local");
     });
 
@@ -196,7 +200,8 @@ describe("InternalMcpCatalogModel", () => {
       makeInternalMcpCatalog,
     }) => {
       const catalog = await makeInternalMcpCatalog({
-        name: "test-catalog",
+        slug: "test-catalog",
+        displayName: "test-catalog",
         serverType: "remote",
       });
 
@@ -215,7 +220,8 @@ describe("InternalMcpCatalogModel", () => {
   describe("labels integration", () => {
     test("create with labels returns labels", async () => {
       const catalog = await InternalMcpCatalogModel.create({
-        name: "catalog-with-labels",
+        slug: "catalog-with-labels",
+        displayName: "catalog-with-labels",
         serverType: "remote",
         labels: [
           { key: "category", value: "database" },
@@ -232,7 +238,8 @@ describe("InternalMcpCatalogModel", () => {
 
     test("create without labels returns empty labels array", async () => {
       const catalog = await InternalMcpCatalogModel.create({
-        name: "catalog-no-labels",
+        slug: "catalog-no-labels",
+        displayName: "catalog-no-labels",
         serverType: "remote",
       });
 
@@ -241,7 +248,8 @@ describe("InternalMcpCatalogModel", () => {
 
     test("findById returns labels", async () => {
       const catalog = await InternalMcpCatalogModel.create({
-        name: "catalog-find-by-id-labels",
+        slug: "catalog-find-by-id-labels",
+        displayName: "catalog-find-by-id-labels",
         serverType: "remote",
         labels: [{ key: "env", value: "prod" }],
       });
@@ -258,7 +266,8 @@ describe("InternalMcpCatalogModel", () => {
 
     test("findByIdWithResolvedSecrets returns labels", async () => {
       const catalog = await InternalMcpCatalogModel.create({
-        name: "catalog-resolved-secrets-labels",
+        slug: "catalog-resolved-secrets-labels",
+        displayName: "catalog-resolved-secrets-labels",
         serverType: "remote",
         labels: [{ key: "scope", value: "internal" }],
       });
@@ -273,15 +282,16 @@ describe("InternalMcpCatalogModel", () => {
       expect(found?.labels[0].value).toBe("internal");
     });
 
-    test("findByName returns labels", async () => {
-      const uniqueName = `catalog-find-by-name-${Date.now()}`;
+    test("findBySlug returns labels", async () => {
+      const uniqueSlug = `catalog-find-by-slug-${Date.now()}`;
       await InternalMcpCatalogModel.create({
-        name: uniqueName,
+        slug: uniqueSlug,
+        displayName: uniqueSlug,
         serverType: "remote",
         labels: [{ key: "type", value: "ai" }],
       });
 
-      const found = await InternalMcpCatalogModel.findByName(uniqueName);
+      const found = await InternalMcpCatalogModel.findBySlug(uniqueSlug);
 
       expect(found).not.toBeNull();
       expect(found?.labels).toHaveLength(1);
@@ -291,7 +301,8 @@ describe("InternalMcpCatalogModel", () => {
 
     test("findAll returns labels for all items", async () => {
       const catalog = await InternalMcpCatalogModel.create({
-        name: "catalog-find-all-labels",
+        slug: "catalog-find-all-labels",
+        displayName: "catalog-find-all-labels",
         serverType: "remote",
         labels: [
           { key: "region", value: "us-east" },
@@ -312,7 +323,8 @@ describe("InternalMcpCatalogModel", () => {
 
     test("searchByQuery returns labels", async () => {
       const catalog = await InternalMcpCatalogModel.create({
-        name: "unique-searchable-catalog-xyz",
+        slug: "unique-searchable-catalog-xyz",
+        displayName: "unique-searchable-catalog-xyz",
         serverType: "remote",
         labels: [{ key: "search-label", value: "found" }],
       });
@@ -330,7 +342,8 @@ describe("InternalMcpCatalogModel", () => {
 
     test("getByIds returns labels", async () => {
       const catalog = await InternalMcpCatalogModel.create({
-        name: "catalog-get-by-ids-labels",
+        slug: "catalog-get-by-ids-labels",
+        displayName: "catalog-get-by-ids-labels",
         serverType: "remote",
         labels: [{ key: "bulk", value: "yes" }],
       });
@@ -346,7 +359,8 @@ describe("InternalMcpCatalogModel", () => {
 
     test("update with labels replaces existing labels", async () => {
       const catalog = await InternalMcpCatalogModel.create({
-        name: "catalog-update-labels",
+        slug: "catalog-update-labels",
+        displayName: "catalog-update-labels",
         serverType: "remote",
         labels: [{ key: "version", value: "v1" }],
       });
@@ -368,17 +382,19 @@ describe("InternalMcpCatalogModel", () => {
 
     test("update without labels does not touch existing labels", async () => {
       const catalog = await InternalMcpCatalogModel.create({
-        name: "catalog-update-no-labels",
+        slug: "catalog-update-no-labels",
+        displayName: "catalog-update-no-labels",
         serverType: "remote",
         labels: [{ key: "keep", value: "me" }],
       });
 
       const updated = await InternalMcpCatalogModel.update(catalog.id, {
-        name: "catalog-update-no-labels-renamed",
+        slug: "catalog-update-no-labels-renamed",
+        displayName: "catalog-update-no-labels-renamed",
       });
 
       expect(updated).not.toBeNull();
-      expect(updated?.name).toBe("catalog-update-no-labels-renamed");
+      expect(updated?.slug).toBe("catalog-update-no-labels-renamed");
       expect(updated?.labels).toHaveLength(1);
       expect(updated?.labels[0].key).toBe("keep");
       expect(updated?.labels[0].value).toBe("me");
@@ -386,7 +402,8 @@ describe("InternalMcpCatalogModel", () => {
 
     test("delete cascades labels", async () => {
       const catalog = await InternalMcpCatalogModel.create({
-        name: "catalog-delete-cascade",
+        slug: "catalog-delete-cascade",
+        displayName: "catalog-delete-cascade",
         serverType: "remote",
         labels: [{ key: "delete-me", value: "cascade" }],
       });
@@ -417,7 +434,8 @@ describe("InternalMcpCatalogModel", () => {
 
       const catalog = await InternalMcpCatalogModel.create(
         {
-          name: "scoped-catalog",
+          slug: "scoped-catalog",
+          displayName: "scoped-catalog",
           serverType: "remote",
           scope: "personal",
         },
@@ -441,7 +459,8 @@ describe("InternalMcpCatalogModel", () => {
 
       const catalog = await InternalMcpCatalogModel.create(
         {
-          name: "team-scoped-catalog",
+          slug: "team-scoped-catalog",
+          displayName: "team-scoped-catalog",
           serverType: "remote",
           scope: "team",
           teams: [team.id],
@@ -526,7 +545,8 @@ describe("InternalMcpCatalogModel", () => {
       const org = await makeOrganization();
 
       await makeInternalMcpCatalog({
-        name: "searchscope-personal-item",
+        slug: "searchscope-personal-item",
+        displayName: "searchscope-personal-item",
         scope: "personal",
         organizationId: org.id,
         authorId: author.id,
@@ -538,7 +558,7 @@ describe("InternalMcpCatalogModel", () => {
         { expandSecrets: false, userId: author.id, isAdmin: false },
       );
       expect(
-        authorResults.some((r) => r.name === "searchscope-personal-item"),
+        authorResults.some((r) => r.slug === "searchscope-personal-item"),
       ).toBe(true);
 
       // Other user does not
@@ -547,7 +567,7 @@ describe("InternalMcpCatalogModel", () => {
         { expandSecrets: false, userId: otherUser.id, isAdmin: false },
       );
       expect(
-        otherResults.some((r) => r.name === "searchscope-personal-item"),
+        otherResults.some((r) => r.slug === "searchscope-personal-item"),
       ).toBe(false);
     });
   });
@@ -590,7 +610,7 @@ describe("InternalMcpCatalogModel", () => {
       );
 
       expect(archestraCatalog).toBeDefined();
-      expect(archestraCatalog?.name).toBe("Archestra");
+      expect(archestraCatalog?.slug).toBe("archestra");
       expect(archestraCatalog?.serverType).toBe("builtin");
     });
   });

@@ -47,7 +47,8 @@ describe("mcp-reinstall", () => {
     ): InternalMcpCatalog =>
       ({
         id: "test-id",
-        name: "Test Server",
+        slug: "Test Server",
+        displayName: "Test Server",
         serverType: "local",
         localConfig: {
           command: "npm",
@@ -63,7 +64,8 @@ describe("mcp-reinstall", () => {
     ): InternalMcpCatalog =>
       ({
         id: "test-id",
-        name: "Test Server",
+        slug: "Test Server",
+        displayName: "Test Server",
         serverType: "remote",
         userConfig,
         oauthConfig,
@@ -213,11 +215,11 @@ describe("mcp-reinstall", () => {
       test("returns true when server NAME changes (even with no prompted env vars)", () => {
         const oldConfig = {
           ...createLocalCatalog([]),
-          name: "Old Server Name",
+          slug: "Old Server Name",
         };
         const newConfig = {
           ...createLocalCatalog([]),
-          name: "New Server Name",
+          slug: "New Server Name",
         };
 
         const result = requiresNewUserInputForReinstall(oldConfig, newConfig);
@@ -235,11 +237,11 @@ describe("mcp-reinstall", () => {
         ];
         const oldConfig = {
           ...createLocalCatalog(envVars),
-          name: "Old Server Name",
+          slug: "Old Server Name",
         };
         const newConfig = {
           ...createLocalCatalog(envVars),
-          name: "New Server Name",
+          slug: "New Server Name",
         };
 
         const result = requiresNewUserInputForReinstall(oldConfig, newConfig);
@@ -336,13 +338,15 @@ describe("mcp-reinstall", () => {
       test("handles missing localConfig.environment gracefully", () => {
         const oldConfig = {
           id: "test-id",
-          name: "Test Server",
+          slug: "Test Server",
+          displayName: "Test Server",
           serverType: "local",
           localConfig: {},
         } as InternalMcpCatalog;
         const newConfig = {
           id: "test-id",
-          name: "Test Server",
+          slug: "Test Server",
+          displayName: "Test Server",
           serverType: "local",
           localConfig: {},
         } as InternalMcpCatalog;
@@ -355,13 +359,15 @@ describe("mcp-reinstall", () => {
       test("handles null localConfig gracefully", () => {
         const oldConfig = {
           id: "test-id",
-          name: "Test Server",
+          slug: "Test Server",
+          displayName: "Test Server",
           serverType: "local",
           localConfig: null,
         } as InternalMcpCatalog;
         const newConfig = {
           id: "test-id",
-          name: "Test Server",
+          slug: "Test Server",
+          displayName: "Test Server",
           serverType: "local",
           localConfig: null,
         } as InternalMcpCatalog;
@@ -394,8 +400,8 @@ describe("mcp-reinstall", () => {
       });
 
       test("returns false when only name changes (no auth config)", () => {
-        const oldConfig = { ...createRemoteCatalog({}), name: "Old Name" };
-        const newConfig = { ...createRemoteCatalog({}), name: "New Name" };
+        const oldConfig = { ...createRemoteCatalog({}), slug: "Old Name" };
+        const newConfig = { ...createRemoteCatalog({}), slug: "New Name" };
 
         const result = requiresNewUserInputForReinstall(oldConfig, newConfig);
 
@@ -406,11 +412,11 @@ describe("mcp-reinstall", () => {
         const oauthConfig = { authorizationUrl: "https://example.com/auth" };
         const oldConfig = {
           ...createRemoteCatalog({}, oauthConfig),
-          name: "Old Name",
+          slug: "Old Name",
         };
         const newConfig = {
           ...createRemoteCatalog({}, oauthConfig),
-          name: "New Name",
+          slug: "New Name",
         };
 
         const result = requiresNewUserInputForReinstall(oldConfig, newConfig);
@@ -420,8 +426,8 @@ describe("mcp-reinstall", () => {
 
       test("returns false when only name changes (with existing required userConfig)", () => {
         const config = { field: { type: "string", required: true } };
-        const oldConfig = { ...createRemoteCatalog(config), name: "Old Name" };
-        const newConfig = { ...createRemoteCatalog(config), name: "New Name" };
+        const oldConfig = { ...createRemoteCatalog(config), slug: "Old Name" };
+        const newConfig = { ...createRemoteCatalog(config), slug: "New Name" };
 
         const result = requiresNewUserInputForReinstall(oldConfig, newConfig);
 
@@ -524,14 +530,16 @@ describe("mcp-reinstall", () => {
       test("handles null userConfig gracefully", () => {
         const oldConfig = {
           id: "test-id",
-          name: "Test Server",
+          slug: "Test Server",
+          displayName: "Test Server",
           serverType: "remote",
           userConfig: null,
           oauthConfig: null,
         } as InternalMcpCatalog;
         const newConfig = {
           id: "test-id",
-          name: "Test Server",
+          slug: "Test Server",
+          displayName: "Test Server",
           serverType: "remote",
           userConfig: null,
           oauthConfig: null,
@@ -573,7 +581,8 @@ describe("mcp-reinstall", () => {
     ): InternalMcpCatalog =>
       ({
         id: "catalog-123",
-        name: "Test Catalog",
+        slug: "Test Catalog",
+        displayName: "Test Catalog",
         serverType: "local",
         localConfig: {
           command: "npm",
@@ -690,7 +699,8 @@ describe("mcp-reinstall", () => {
       });
       const catalog = createCatalog({
         serverType: "remote",
-        name: "New Catalog Name",
+        slug: "New Catalog Name",
+        displayName: "New Catalog Name",
       });
 
       vi.mocked(McpServerModel.getToolsFromServer).mockResolvedValue([
@@ -723,7 +733,8 @@ describe("mcp-reinstall", () => {
       });
       const catalog = createCatalog({
         serverType: "local",
-        name: "microsoft__playwright-mcp",
+        slug: "microsoft__playwright-mcp",
+        displayName: "microsoft__playwright-mcp",
       });
 
       vi.mocked(McpServerRuntimeManager.restartServer).mockResolvedValue(
@@ -760,7 +771,8 @@ describe("mcp-reinstall", () => {
       });
       const catalog = createCatalog({
         serverType: "local",
-        name: "new-catalog-name",
+        slug: "new-catalog-name",
+        displayName: "new-catalog-name",
       });
 
       vi.mocked(McpServerRuntimeManager.restartServer).mockResolvedValue(
@@ -801,7 +813,8 @@ describe("mcp-reinstall", () => {
       });
       const catalog = createCatalog({
         serverType: "local",
-        name: "new-name",
+        slug: "new-name",
+        displayName: "new-name",
       });
 
       vi.mocked(McpServerRuntimeManager.restartServer).mockResolvedValue(
@@ -836,7 +849,8 @@ describe("mcp-reinstall", () => {
       });
       const catalog = createCatalog({
         serverType: "local",
-        name: "microsoft__playwright-mcp",
+        slug: "microsoft__playwright-mcp",
+        displayName: "microsoft__playwright-mcp",
       });
 
       vi.mocked(McpServerRuntimeManager.restartServer).mockResolvedValue(

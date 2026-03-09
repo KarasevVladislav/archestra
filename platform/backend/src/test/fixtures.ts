@@ -415,7 +415,8 @@ async function makeInternalMcpCatalog(
     Pick<
       InsertInternalMcpCatalog,
       | "id"
-      | "name"
+      | "slug"
+      | "displayName"
       | "serverType"
       | "serverUrl"
       | "description"
@@ -447,7 +448,8 @@ async function makeInternalMcpCatalog(
 
   return await InternalMcpCatalogModel.create(
     {
-      name: `test-catalog-${crypto.randomUUID().substring(0, 8)}`,
+      slug: `test-catalog-${crypto.randomUUID().substring(0, 8)}`,
+      displayName: "Test Catalog",
       serverType: "remote",
       serverUrl: "https://api.example.com/mcp/",
       scope: "org",
@@ -936,7 +938,8 @@ async function seedAndAssignArchestraTools(agentId: string): Promise<void> {
   if (!existing) {
     await db.insert(schema.internalMcpCatalogTable).values({
       id: ARCHESTRA_MCP_CATALOG_ID,
-      name: "Archestra",
+      slug: "Archestra",
+      displayName: "Archestra",
       description:
         "Built-in Archestra tools for managing profiles, limits, policies, and MCP servers.",
       serverType: "builtin",

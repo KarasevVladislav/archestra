@@ -738,7 +738,7 @@ interface ReadOnlyMcpServerPillProps {
   credentialSourceMcpServerId?: string | null;
   catalogItems: Array<{
     id: string;
-    name: string;
+    displayName: string;
     description?: string | null;
   }>;
   useDynamicTeamCredential?: boolean;
@@ -759,7 +759,7 @@ function ReadOnlyMcpServerPill({
     : null;
 
   // Use catalog name if available, otherwise fall back to server name
-  const displayName = catalogItem?.name ?? server.name;
+  const displayName = catalogItem?.displayName ?? server.name;
   const displayDescription =
     catalogItem?.description ?? server.description ?? null;
 

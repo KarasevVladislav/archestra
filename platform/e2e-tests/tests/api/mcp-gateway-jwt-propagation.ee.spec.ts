@@ -77,7 +77,7 @@ test.describe("MCP Gateway - JWT Propagation to Upstream MCP Server", () => {
     let profileId: string | undefined;
     let catalogId: string | undefined;
     let serverId: string | undefined;
-    const catalogName = `jwks-propagation-test-${Date.now()}`;
+    const catalogSlug = `jwks-propagation-test-${Date.now()}`;
 
     try {
       // STEP 4: Create an MCP Gateway profile linked to the IdP
@@ -104,7 +104,8 @@ test.describe("MCP Gateway - JWT Propagation to Upstream MCP Server", () => {
 
       // STEP 5: Register the upstream MCP server as a remote MCP catalog item
       const catalogResponse = await createMcpCatalogItem(request, {
-        name: catalogName,
+        slug: catalogSlug,
+        displayName: catalogSlug,
         description: "E2E test: JWKS MCP server for JWT propagation testing",
         serverType: "remote",
         serverUrl: `${MCP_SERVER_JWKS_BACKEND_URL}/mcp`,
@@ -117,7 +118,7 @@ test.describe("MCP Gateway - JWT Propagation to Upstream MCP Server", () => {
       // the upstream server during tool discovery (it requires JWT auth).
       // Pass agentIds so discovered tools are automatically assigned to the profile.
       const installResponse = await installMcpServer(request, {
-        name: catalogName,
+        name: catalogSlug,
         catalogId,
         accessToken: jwt,
         agentIds: [pid],
@@ -126,8 +127,8 @@ test.describe("MCP Gateway - JWT Propagation to Upstream MCP Server", () => {
       serverId = mcpServer.id;
 
       // STEP 7: Verify tools from the upstream server were discovered and assigned
-      // The tool name format is: <catalogName>__<toolName>
-      const getServerInfoToolName = `${catalogName}${MCP_SERVER_TOOL_NAME_SEPARATOR}get-server-info`;
+      // The tool name format is: <catalogSlug>__<toolName>
+      const getServerInfoToolName = `${catalogSlug}${MCP_SERVER_TOOL_NAME_SEPARATOR}get-server-info`;
       const agentTool = await waitForAgentTool(
         request,
         pid,
@@ -246,7 +247,7 @@ test.describe("MCP Gateway - JWT Propagation to Upstream MCP Server", () => {
     let profileId: string | undefined;
     let catalogId: string | undefined;
     let serverId: string | undefined;
-    const catalogName = `jwks-reject-test-${Date.now()}`;
+    const catalogSlug = `jwks-reject-test-${Date.now()}`;
 
     try {
       // Create MCP Gateway WITHOUT IdP (so archestra token is used, not JWT)
@@ -268,7 +269,8 @@ test.describe("MCP Gateway - JWT Propagation to Upstream MCP Server", () => {
 
       // Register upstream server
       const catalogResponse = await createMcpCatalogItem(request, {
-        name: catalogName,
+        slug: catalogSlug,
+        displayName: catalogSlug,
         description: "E2E test: JWT rejection test",
         serverType: "remote",
         serverUrl: `${MCP_SERVER_JWKS_BACKEND_URL}/mcp`,
@@ -280,7 +282,7 @@ test.describe("MCP Gateway - JWT Propagation to Upstream MCP Server", () => {
       // tool discovery (the upstream server requires JWT auth).
       // Pass agentIds so discovered tools are automatically assigned to the profile.
       const installResponse = await installMcpServer(request, {
-        name: catalogName,
+        name: catalogSlug,
         catalogId,
         accessToken: jwt,
         agentIds: [pid],
@@ -289,7 +291,7 @@ test.describe("MCP Gateway - JWT Propagation to Upstream MCP Server", () => {
       serverId = mcpServer.id;
 
       // Wait for tools to be assigned
-      const toolName = `${catalogName}${MCP_SERVER_TOOL_NAME_SEPARATOR}get-server-info`;
+      const toolName = `${catalogSlug}${MCP_SERVER_TOOL_NAME_SEPARATOR}get-server-info`;
       await waitForAgentTool(request, pid, toolName, {
         maxAttempts: 30,
         delayMs: 2000,
@@ -378,7 +380,7 @@ test.describe("MCP Gateway - JWT Propagation to Upstream MCP Server", () => {
     let profileId: string | undefined;
     let catalogId: string | undefined;
     let serverId: string | undefined;
-    const catalogName = `jwks-local-k8s-test-${Date.now()}`;
+    const catalogSlug = `jwks-local-k8s-test-${Date.now()}`;
 
     try {
       // STEP 3: Create an MCP Gateway profile linked to the IdP
@@ -406,7 +408,8 @@ test.describe("MCP Gateway - JWT Propagation to Upstream MCP Server", () => {
       // Uses the same Docker image as the Helm-deployed instance but runs
       // as a K8s-orchestrated server via streamable-http transport.
       const catalogResponse = await createMcpCatalogItem(request, {
-        name: catalogName,
+        slug: catalogSlug,
+        displayName: catalogSlug,
         description:
           "E2E test: Local K8s JWKS MCP server for JWT propagation testing",
         serverType: "local",
@@ -458,7 +461,7 @@ test.describe("MCP Gateway - JWT Propagation to Upstream MCP Server", () => {
       // (the JWKS server requires JWT auth for all requests including MCP protocol).
       // Pass agentIds so discovered tools are automatically assigned to the profile.
       const installResponse = await installMcpServer(request, {
-        name: catalogName,
+        name: catalogSlug,
         catalogId,
         accessToken: jwt,
         agentIds: [pid],
@@ -471,7 +474,7 @@ test.describe("MCP Gateway - JWT Propagation to Upstream MCP Server", () => {
       await waitForServerInstallation(request, sid);
 
       // STEP 7: Verify tools from the local server were discovered and assigned
-      const getServerInfoToolName = `${catalogName}${MCP_SERVER_TOOL_NAME_SEPARATOR}get-server-info`;
+      const getServerInfoToolName = `${catalogSlug}${MCP_SERVER_TOOL_NAME_SEPARATOR}get-server-info`;
       const agentTool = await waitForAgentTool(
         request,
         pid,

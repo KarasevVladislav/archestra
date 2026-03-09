@@ -189,7 +189,8 @@ describe("executeArchestraTool", () => {
       makeInternalMcpCatalog,
     }) => {
       await makeInternalMcpCatalog({
-        name: "Test Server",
+        slug: "Test Server",
+        displayName: "Test Server",
         version: "1.0.0",
         description: "A test server",
         serverType: "remote",
@@ -245,13 +246,15 @@ describe("executeArchestraTool", () => {
       makeInternalMcpCatalog,
     }) => {
       await makeInternalMcpCatalog({
-        name: "Test Server",
+        slug: "Test Server",
+        displayName: "Test Server",
         description: "A server for testing",
         serverType: "remote",
       });
 
       await makeInternalMcpCatalog({
-        name: "Other Server",
+        slug: "Other Server",
+        displayName: "Other Server",
         description: "A different server",
         serverType: "remote",
       });

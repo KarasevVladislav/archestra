@@ -7,7 +7,8 @@ test.describe("MCP Catalog Labels", () => {
     deleteMcpCatalogItem,
   }) => {
     const response = await createMcpCatalogItem(request, {
-      name: `label-test-${Date.now()}`,
+      slug: `label-test-${Date.now()}`,
+      displayName: `label-test-${Date.now()}`,
       description: "Test catalog item with labels",
       serverType: "remote",
       serverUrl: "https://example.com/mcp",
@@ -36,7 +37,8 @@ test.describe("MCP Catalog Labels", () => {
     deleteMcpCatalogItem,
   }) => {
     const createResponse = await createMcpCatalogItem(request, {
-      name: `label-get-test-${Date.now()}`,
+      slug: `label-get-test-${Date.now()}`,
+      displayName: `label-get-test-${Date.now()}`,
       description: "Test get with labels",
       serverType: "remote",
       serverUrl: "https://example.com/mcp",
@@ -67,7 +69,8 @@ test.describe("MCP Catalog Labels", () => {
     deleteMcpCatalogItem,
   }) => {
     const createResponse = await createMcpCatalogItem(request, {
-      name: `label-update-test-${Date.now()}`,
+      slug: `label-update-test-${Date.now()}`,
+      displayName: `label-update-test-${Date.now()}`,
       description: "Test label update",
       serverType: "remote",
       serverUrl: "https://example.com/mcp",
@@ -109,7 +112,8 @@ test.describe("MCP Catalog Labels", () => {
     deleteMcpCatalogItem,
   }) => {
     const createResponse = await createMcpCatalogItem(request, {
-      name: `label-remove-test-${Date.now()}`,
+      slug: `label-remove-test-${Date.now()}`,
+      displayName: `label-remove-test-${Date.now()}`,
       description: "Test label removal",
       serverType: "remote",
       serverUrl: "https://example.com/mcp",
@@ -146,7 +150,8 @@ test.describe("MCP Catalog Labels", () => {
     deleteMcpCatalogItem,
   }) => {
     const createResponse = await createMcpCatalogItem(request, {
-      name: `label-list-test-${Date.now()}`,
+      slug: `label-list-test-${Date.now()}`,
+      displayName: `label-list-test-${Date.now()}`,
       description: "Test labels in list",
       serverType: "remote",
       serverUrl: "https://example.com/mcp",
@@ -181,7 +186,8 @@ test.describe("MCP Catalog Labels", () => {
     deleteMcpCatalogItem,
   }) => {
     const createResponse = await createMcpCatalogItem(request, {
-      name: `label-keys-test-${Date.now()}`,
+      slug: `label-keys-test-${Date.now()}`,
+      displayName: `label-keys-test-${Date.now()}`,
       description: "Test label keys endpoint",
       serverType: "remote",
       serverUrl: "https://example.com/mcp",
@@ -215,7 +221,8 @@ test.describe("MCP Catalog Labels", () => {
   }) => {
     const ts = Date.now();
     const createResponse1 = await createMcpCatalogItem(request, {
-      name: `label-values-test-1-${ts}`,
+      slug: `label-values-test-1-${ts}`,
+      displayName: `label-values-test-1-${ts}`,
       description: "Test label values endpoint",
       serverType: "remote",
       serverUrl: "https://example.com/mcp",
@@ -223,7 +230,8 @@ test.describe("MCP Catalog Labels", () => {
     });
 
     const createResponse2 = await createMcpCatalogItem(request, {
-      name: `label-values-test-2-${ts}`,
+      slug: `label-values-test-2-${ts}`,
+      displayName: `label-values-test-2-${ts}`,
       description: "Test label values endpoint",
       serverType: "remote",
       serverUrl: "https://example.com/mcp",
@@ -255,7 +263,8 @@ test.describe("MCP Catalog Labels", () => {
     deleteMcpCatalogItem,
   }) => {
     const createResponse = await createMcpCatalogItem(request, {
-      name: `label-cascade-test-${Date.now()}`,
+      slug: `label-cascade-test-${Date.now()}`,
+      displayName: `label-cascade-test-${Date.now()}`,
       description: "Test cascade delete",
       serverType: "remote",
       serverUrl: "https://example.com/mcp",

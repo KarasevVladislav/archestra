@@ -349,7 +349,7 @@ export async function executeArchestraTool(
       // Format the results
       const formattedResults = catalogItems
         .map((item) => {
-          let result = `**${item.name}**`;
+          let result = `**${item.slug}**`;
           if (item.version) result += ` (v${item.version})`;
           if (item.description) result += `\n  ${item.description}`;
           result += `\n  Type: ${item.serverType}`;

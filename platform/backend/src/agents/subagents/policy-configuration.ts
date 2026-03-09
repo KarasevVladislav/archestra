@@ -103,7 +103,7 @@ export class PolicyConfigurationService {
         const catalog = await InternalMcpCatalogModel.findById(tool.catalogId, {
           expandSecrets: false,
         });
-        mcpServerName = catalog?.name ?? null;
+        mcpServerName = catalog?.slug ?? null;
       }
 
       logger.debug(

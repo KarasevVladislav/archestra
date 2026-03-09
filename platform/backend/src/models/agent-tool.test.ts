@@ -470,8 +470,14 @@ describe("AgentToolModel.findAll", () => {
       makeInternalMcpCatalog,
     }) => {
       const agent = await makeAgent();
-      const catalog1 = await makeInternalMcpCatalog({ name: "Catalog 1" });
-      const catalog2 = await makeInternalMcpCatalog({ name: "Catalog 2" });
+      const catalog1 = await makeInternalMcpCatalog({
+        slug: "catalog-1",
+        displayName: "Catalog 1",
+      });
+      const catalog2 = await makeInternalMcpCatalog({
+        slug: "catalog-2",
+        displayName: "Catalog 2",
+      });
 
       const tool1 = await makeTool({ name: "tool-1", catalogId: catalog1.id });
       const tool2 = await makeTool({ name: "tool-2", catalogId: catalog2.id });

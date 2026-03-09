@@ -26,7 +26,7 @@ export function McpInstallDialogs({ orchestrator }: McpInstallDialogsProps) {
         onOpenChange={(open) => {
           if (!open) orchestrator.closeOAuth();
         }}
-        serverName={orchestrator.selectedCatalogItem?.name || ""}
+        serverName={orchestrator.selectedCatalogItem?.displayName || ""}
         onConfirm={orchestrator.handleOAuthConfirm}
         onCancel={orchestrator.closeOAuth}
         catalogId={orchestrator.selectedCatalogItem?.id}

@@ -237,7 +237,7 @@ test.describe("OAuth for Self-Hosted MCP Servers", () => {
         method: "post",
         urlSuffix: "/api/mcp_server",
         data: {
-          name: catalogItem.name,
+          name: catalogItem.slug,
           catalogId: catalogItem.id,
           secretId,
         },
@@ -321,7 +321,7 @@ test.describe("OAuth for Self-Hosted MCP Servers", () => {
         method: "post",
         urlSuffix: "/api/mcp_server",
         data: {
-          name: catalogItem.name,
+          name: catalogItem.slug,
           catalogId: catalogItem.id,
           secretId,
           environmentValues: { CUSTOM_ENV: "test-value" },
@@ -391,7 +391,7 @@ test.describe("OAuth for Self-Hosted MCP Servers", () => {
         method: "post",
         urlSuffix: "/api/mcp_server",
         data: {
-          name: catalogItem.name,
+          name: catalogItem.slug,
           catalogId: catalogItem.id,
           secretId,
           environmentValues: { ADDITIONAL_VAR: "some-config" },
@@ -417,7 +417,8 @@ test.describe("OAuth for Self-Hosted MCP Servers", () => {
   }) => {
     // Create a catalog item without OAuth
     const createResponse = await createMcpCatalogItem(request, {
-      name: `no-oauth-test-${Date.now()}`,
+      slug: `no-oauth-test-${Date.now()}`,
+      displayName: `no-oauth-test-${Date.now()}`,
       description: "E2E test: server without OAuth",
       serverType: "remote",
       serverUrl: "https://example.com/mcp",

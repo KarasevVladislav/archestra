@@ -16,7 +16,8 @@ export function transformFormToApiData(
   values: McpCatalogFormValues,
 ): McpCatalogApiData {
   const data: McpCatalogApiData = {
-    name: values.name,
+    slug: values.name,
+    displayName: values.name,
     description: values.description || null,
     serverType: values.serverType,
     icon: values.icon ?? null,
@@ -87,7 +88,7 @@ export function transformFormToApiData(
         : values.serverUrl || "";
 
     data.oauthConfig = {
-      name: values.name, // Use name as OAuth provider name
+      name: values.name, // Use display name as OAuth provider name
       server_url: oauthServerUrl, // OAuth server URL for discovery/authorization
       client_id: values.oauthConfig.client_id || "",
       // Only include client_secret if no BYOS vault path is set
@@ -177,8 +178,8 @@ export function transformCatalogItemToFormValues(
     authMethod = "bearer";
   } else if (
     // Special case: GitHub server uses Bearer Token but external catalog doesn't define userConfig
-    item.name.includes("githubcopilot") ||
-    item.name.includes("github")
+    item.slug.includes("githubcopilot") ||
+    item.slug.includes("github")
   ) {
     authMethod = "bearer";
   }
@@ -306,7 +307,7 @@ export function transformCatalogItemToFormValues(
   }
 
   return {
-    name: item.name,
+    name: item.displayName,
     description: item.description || "",
     icon: item.icon ?? null,
     serverType: item.serverType as "remote" | "local",

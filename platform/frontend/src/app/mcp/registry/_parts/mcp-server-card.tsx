@@ -247,7 +247,7 @@ export function McpServerCard({
 
   const handleChatWithMcpServer = async () => {
     setIsChatCreating(true);
-    const agentName = item.label || item.name;
+    const agentName = item.label || item.displayName;
     try {
       // Get or create: check if a personal agent with this name already exists for the current user
       const { data: existingAgents } = await archestraApiSdk.getAllAgents({
@@ -652,7 +652,7 @@ export function McpServerCard({
                       size="sm"
                       variant="outline"
                       className="w-full"
-                      data-testid={`${E2eTestId.ConnectCatalogItemButton}-${item.name}`}
+                      data-testid={`${E2eTestId.ConnectCatalogItemButton}-${item.slug}`}
                     >
                       <Server className="mr-2 h-4 w-4" />
                       Install
@@ -716,7 +716,7 @@ export function McpServerCard({
                       size="sm"
                       variant="outline"
                       className="w-full"
-                      data-testid={`${E2eTestId.ConnectCatalogItemButton}-${item.name}`}
+                      data-testid={`${E2eTestId.ConnectCatalogItemButton}-${item.slug}`}
                     >
                       <Server className="mr-2 h-4 w-4" />
                       Install
@@ -790,16 +790,16 @@ export function McpServerCard({
   return (
     <Card
       className="flex flex-col relative pt-4 gap-4 h-full"
-      data-testid={`${E2eTestId.McpServerCard}-${item.name}`}
+      data-testid={`${E2eTestId.McpServerCard}-${item.slug}`}
     >
       <CardHeader className="gap-0">
         <div className="flex items-start justify-between gap-4 overflow-hidden">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 mb-1 overflow-hidden w-full">
               <McpCatalogIcon icon={item.icon} catalogId={item.id} size={20} />
-              <TruncatedTooltip content={item.name}>
+              <TruncatedTooltip content={item.displayName}>
                 <span className="text-lg font-semibold whitespace-nowrap text-ellipsis overflow-hidden">
-                  {item.name}
+                  {item.displayName}
                 </span>
               </TruncatedTooltip>
             </div>
@@ -842,14 +842,14 @@ export function McpServerCard({
               <div className="flex items-center justify-between px-3 py-2 text-sm">
                 <span
                   className="text-destructive"
-                  data-testid={`${E2eTestId.McpServerError}-${item.name}`}
+                  data-testid={`${E2eTestId.McpServerError}-${item.slug}`}
                 >
                   Failed to start MCP server,{" "}
                   <button
                     type="button"
                     onClick={() => openSettingsPage("debug-logs")}
                     className="text-primary hover:underline cursor-pointer"
-                    data-testid={`${E2eTestId.McpLogsViewButton}-${item.name}`}
+                    data-testid={`${E2eTestId.McpLogsViewButton}-${item.slug}`}
                   >
                     view the logs
                   </button>{" "}
@@ -858,7 +858,7 @@ export function McpServerCard({
                     type="button"
                     onClick={() => openSettingsPage("configuration")}
                     className="text-primary hover:underline cursor-pointer"
-                    data-testid={`${E2eTestId.McpLogsEditConfigButton}-${item.name}`}
+                    data-testid={`${E2eTestId.McpLogsEditConfigButton}-${item.slug}`}
                   >
                     edit your config
                   </button>

@@ -123,15 +123,15 @@ export async function addCustomSelfHostedCatalogItem({
   }
 
   const newCatalogItem = catalogItems.data.find(
-    (item) => item.name === catalogItemName,
+    (item) => item.slug === catalogItemName,
   );
   if (!newCatalogItem) {
-    const itemNames = catalogItems.data.map((i) => i.name).join(", ");
+    const itemNames = catalogItems.data.map((i) => i.slug).join(", ");
     throw new Error(
       `Failed to find catalog item "${catalogItemName}". Available items: [${itemNames}]`,
     );
   }
-  return { id: newCatalogItem.id, name: newCatalogItem.name };
+  return { id: newCatalogItem.id, name: newCatalogItem.slug };
 }
 
 export async function closeOpenDialogs(

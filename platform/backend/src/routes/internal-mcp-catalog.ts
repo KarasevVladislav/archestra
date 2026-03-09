@@ -142,7 +142,7 @@ const internalMcpCatalogRoutes: FastifyPluginAsyncZod = async (fastify) => {
         const vaultReference = `${oauthClientSecretVaultPath}#${oauthClientSecretVaultKey}`;
         const secret = await secretManager().createSecret(
           { client_secret: vaultReference },
-          `${restBody.name}-oauth-client-secret-vault`,
+          `${restBody.slug}-oauth-client-secret-vault`,
         );
         clientSecretId = secret.id;
         restBody.clientSecretId = clientSecretId;
@@ -163,7 +163,7 @@ const internalMcpCatalogRoutes: FastifyPluginAsyncZod = async (fastify) => {
         const clientSecret = restBody.oauthConfig.client_secret;
         const secret = await secretManager().createSecret(
           { client_secret: clientSecret },
-          `${restBody.name}-oauth-client-secret`,
+          `${restBody.slug}-oauth-client-secret`,
         );
         clientSecretId = secret.id;
 
@@ -187,7 +187,7 @@ const internalMcpCatalogRoutes: FastifyPluginAsyncZod = async (fastify) => {
         const vaultReference = `${localConfigVaultPath}#${localConfigVaultKey}`;
         const secret = await secretManager().createSecret(
           { [localConfigVaultKey]: vaultReference },
-          `${restBody.name}-local-config-env-vault`,
+          `${restBody.slug}-local-config-env-vault`,
         );
         localConfigSecretId = secret.id;
         restBody.localConfigSecretId = localConfigSecretId;
@@ -240,7 +240,7 @@ const internalMcpCatalogRoutes: FastifyPluginAsyncZod = async (fastify) => {
         if (Object.keys(secretEnvVars).length > 0) {
           const secret = await secretManager().createSecret(
             secretEnvVars,
-            `${restBody.name}-local-config-env`,
+            `${restBody.slug}-local-config-env`,
           );
           localConfigSecretId = secret.id;
           restBody.localConfigSecretId = localConfigSecretId;
@@ -356,8 +356,9 @@ const internalMcpCatalogRoutes: FastifyPluginAsyncZod = async (fastify) => {
       }
 
       // Prevent renaming the Playwright catalog item
-      if (isPlaywrightCatalogItem(id) && body.name !== undefined) {
-        delete body.name;
+      if (isPlaywrightCatalogItem(id)) {
+        if (body.slug !== undefined) delete body.slug;
+        if (body.displayName !== undefined) delete body.displayName;
       }
 
       const {
@@ -428,7 +429,7 @@ const internalMcpCatalogRoutes: FastifyPluginAsyncZod = async (fastify) => {
         const vaultReference = `${oauthClientSecretVaultPath}#${oauthClientSecretVaultKey}`;
         const secret = await secretManager().createSecret(
           { client_secret: vaultReference },
-          `${originalCatalogItem.name}-oauth-client-secret-vault`,
+          `${originalCatalogItem.slug}-oauth-client-secret-vault`,
         );
         clientSecretId = secret.id;
         restBody.clientSecretId = clientSecretId;
@@ -456,7 +457,7 @@ const internalMcpCatalogRoutes: FastifyPluginAsyncZod = async (fastify) => {
           // Create new secret
           const secret = await secretManager().createSecret(
             { client_secret: clientSecret },
-            `${originalCatalogItem.name}-oauth-client-secret`,
+            `${originalCatalogItem.slug}-oauth-client-secret`,
           );
           clientSecretId = secret.id;
         }
@@ -485,7 +486,7 @@ const internalMcpCatalogRoutes: FastifyPluginAsyncZod = async (fastify) => {
         const vaultReference = `${localConfigVaultPath}#${localConfigVaultKey}`;
         const secret = await secretManager().createSecret(
           { [localConfigVaultKey]: vaultReference },
-          `${originalCatalogItem.name}-local-config-env-vault`,
+          `${originalCatalogItem.slug}-local-config-env-vault`,
         );
         localConfigSecretId = secret.id;
         restBody.localConfigSecretId = localConfigSecretId;
@@ -569,7 +570,7 @@ const internalMcpCatalogRoutes: FastifyPluginAsyncZod = async (fastify) => {
             // Create new secret
             const secret = await secretManager().createSecret(
               secretEnvVars,
-              `${originalCatalogItem.name}-local-config-env`,
+              `${originalCatalogItem.slug}-local-config-env`,
             );
             localConfigSecretId = secret.id;
           }
@@ -746,24 +747,24 @@ const internalMcpCatalogRoutes: FastifyPluginAsyncZod = async (fastify) => {
   );
 
   fastify.delete(
-    "/api/internal_mcp_catalog/by-name/:name",
+    "/api/internal_mcp_catalog/by-slug/:slug",
     {
       schema: {
-        operationId: RouteId.DeleteInternalMcpCatalogItemByName,
-        description: "Delete an Internal MCP catalog item by name",
+        operationId: RouteId.DeleteInternalMcpCatalogItemBySlug,
+        description: "Delete an Internal MCP catalog item by slug",
         tags: ["MCP Catalog"],
         params: z.object({
-          name: z.string().min(1),
+          slug: z.string().min(1),
         }),
         response: constructResponseSchema(DeleteObjectResponseSchema),
       },
     },
     async (request, reply) => {
-      const { name } = request.params;
-      const catalogItem = await InternalMcpCatalogModel.findByName(name);
+      const { slug } = request.params;
+      const catalogItem = await InternalMcpCatalogModel.findBySlug(slug);
 
       if (!catalogItem) {
-        throw new ApiError(404, `Catalog item with name "${name}" not found`);
+        throw new ApiError(404, `Catalog item with slug "${slug}" not found`);
       }
 
       if (isBuiltInCatalogId(catalogItem.id)) {
@@ -856,7 +857,7 @@ const internalMcpCatalogRoutes: FastifyPluginAsyncZod = async (fastify) => {
       // Generate a default YAML template
       const yamlTemplate = generateDeploymentYamlTemplate({
         serverId: "{server_id}",
-        serverName: catalogItem.name,
+        serverName: catalogItem.slug,
         namespace: config.orchestrator.kubernetes.namespace,
         dockerImage:
           catalogItem.localConfig?.dockerImage ||
@@ -932,7 +933,7 @@ const internalMcpCatalogRoutes: FastifyPluginAsyncZod = async (fastify) => {
       // Generate and return a fresh default YAML template
       const yamlTemplate = generateDeploymentYamlTemplate({
         serverId: "{server_id}",
-        serverName: catalogItem.name,
+        serverName: catalogItem.slug,
         namespace: config.orchestrator.kubernetes.namespace,
         dockerImage:
           catalogItem.localConfig?.dockerImage ||

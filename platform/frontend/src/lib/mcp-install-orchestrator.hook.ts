@@ -193,7 +193,8 @@ export function useMcpInstallOrchestrator() {
 
       await reauthMutation.mutateAsync({
         id: reauthServerId,
-        name: catalogItem.name,
+        slug: catalogItem.slug,
+        displayName: catalogItem.displayName,
         ...(accessToken && { accessToken }),
         ...(result.isByosVault && {
           userConfigValues: result.metadata as Record<string, string>,
@@ -220,7 +221,7 @@ export function useMcpInstallOrchestrator() {
         : undefined;
 
     await installMutation.mutateAsync({
-      name: catalogItem.name,
+      name: catalogItem.slug,
       catalogId: catalogItem.id,
       ...(accessToken && { accessToken }),
       ...(result.isByosVault && {
@@ -240,7 +241,8 @@ export function useMcpInstallOrchestrator() {
     if (reauthServerId) {
       await reauthMutation.mutateAsync({
         id: reauthServerId,
-        name: localServerCatalogItem.name,
+        slug: localServerCatalogItem.slug,
+        displayName: localServerCatalogItem.displayName,
         environmentValues: installResult.environmentValues,
         isByosVault: installResult.isByosVault,
       });
@@ -282,7 +284,7 @@ export function useMcpInstallOrchestrator() {
     }
 
     await installMutation.mutateAsync({
-      name: localServerCatalogItem.name,
+      name: localServerCatalogItem.slug,
       catalogId: localServerCatalogItem.id,
       environmentValues: installResult.environmentValues,
       isByosVault: installResult.isByosVault,
@@ -298,7 +300,7 @@ export function useMcpInstallOrchestrator() {
     if (!noAuthCatalogItem) return;
 
     await installMutation.mutateAsync({
-      name: noAuthCatalogItem.name,
+      name: noAuthCatalogItem.slug,
       catalogId: noAuthCatalogItem.id,
       teamId: result.teamId ?? undefined,
     });

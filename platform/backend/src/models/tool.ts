@@ -309,7 +309,7 @@ class ToolModel {
         },
         catalog: {
           id: schema.internalMcpCatalogTable.id,
-          name: schema.internalMcpCatalogTable.name,
+          slug: schema.internalMcpCatalogTable.slug,
         },
       })
       .from(schema.toolsTable)
@@ -583,7 +583,8 @@ class ToolModel {
       .insert(schema.internalMcpCatalogTable)
       .values({
         id: catalogId,
-        name: "Archestra",
+        slug: "Archestra",
+        displayName: "Archestra",
         description:
           "Built-in Archestra tools for managing profiles, limits, policies, and MCP servers.",
         serverType: "builtin",
@@ -742,7 +743,7 @@ class ToolModel {
       executionSourceMcpServerId: string | null;
       useDynamicTeamCredential: boolean;
       catalogId: string | null;
-      catalogName: string | null;
+      catalogSlug: string | null;
     }>
   > {
     if (toolNames.length === 0) {
@@ -761,7 +762,7 @@ class ToolModel {
         useDynamicTeamCredential:
           schema.agentToolsTable.useDynamicTeamCredential,
         catalogId: schema.toolsTable.catalogId,
-        catalogName: schema.internalMcpCatalogTable.name,
+        catalogSlug: schema.internalMcpCatalogTable.slug,
       })
       .from(schema.toolsTable)
       .innerJoin(

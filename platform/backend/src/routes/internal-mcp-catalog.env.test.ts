@@ -12,7 +12,8 @@ describe("Internal MCP Catalog - Environment Variables", () => {
   describe("CREATE - Environment Variable Handling", () => {
     test("1.1 creates catalog with plain_text env vars", async () => {
       const catalog = await InternalMcpCatalogModel.create({
-        name: "test-plain-text-env",
+        slug: "test-plain-text-env",
+        displayName: "Test Plain Text Env",
         serverType: "local",
         localConfig: {
           command: "npx",
@@ -60,7 +61,8 @@ describe("Internal MCP Catalog - Environment Variables", () => {
       });
 
       const catalog = await InternalMcpCatalogModel.create({
-        name: "test-secret-env",
+        slug: "test-secret-env",
+        displayName: "Test Secret Env",
         serverType: "local",
         localConfigSecretId: envSecret.id,
         localConfig: {
@@ -96,7 +98,8 @@ describe("Internal MCP Catalog - Environment Variables", () => {
 
     test("1.3 creates catalog with prompted secret env vars", async () => {
       const catalog = await InternalMcpCatalogModel.create({
-        name: "test-prompted-secret",
+        slug: "test-prompted-secret",
+        displayName: "Test Prompted Secret",
         serverType: "local",
         localConfig: {
           command: "npx",
@@ -147,7 +150,8 @@ describe("Internal MCP Catalog - Environment Variables", () => {
       });
 
       const catalog = await InternalMcpCatalogModel.create({
-        name: "test-yaml-env",
+        slug: "test-yaml-env",
+        displayName: "Test YAML Env",
         serverType: "local",
         deploymentSpecYaml: yamlTemplate,
         localConfig: {
@@ -199,7 +203,8 @@ describe("Internal MCP Catalog - Environment Variables", () => {
     test("2.1 adds new plain_text env var to existing catalog", async () => {
       // Create catalog with one env var
       const catalog = await InternalMcpCatalogModel.create({
-        name: "test-add-env",
+        slug: "test-add-env",
+        displayName: "Test Add Env",
         serverType: "local",
         localConfig: {
           command: "npx",
@@ -247,7 +252,8 @@ describe("Internal MCP Catalog - Environment Variables", () => {
 
     test("2.2 adds new secret env var to existing catalog", async () => {
       const catalog = await InternalMcpCatalogModel.create({
-        name: "test-add-secret-env",
+        slug: "test-add-secret-env",
+        displayName: "Test Add Secret Env",
         serverType: "local",
         localConfig: {
           command: "npx",
@@ -316,7 +322,8 @@ describe("Internal MCP Catalog - Environment Variables", () => {
       });
 
       const catalog = await InternalMcpCatalogModel.create({
-        name: "test-remove-env",
+        slug: "test-remove-env",
+        displayName: "Test Remove Env",
         serverType: "local",
         deploymentSpecYaml: yamlTemplate,
         localConfig: {
@@ -707,7 +714,8 @@ spec:
   describe("Edge Cases", () => {
     test("handles empty environment array", async () => {
       const catalog = await InternalMcpCatalogModel.create({
-        name: "test-empty-env",
+        slug: "test-empty-env",
+        displayName: "Test Empty Env",
         serverType: "local",
         localConfig: {
           command: "npx",
@@ -721,7 +729,8 @@ spec:
 
     test("handles undefined environment", async () => {
       const catalog = await InternalMcpCatalogModel.create({
-        name: "test-undefined-env",
+        slug: "test-undefined-env",
+        displayName: "Test Undefined Env",
         serverType: "local",
         localConfig: {
           command: "npx",

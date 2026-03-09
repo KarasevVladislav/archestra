@@ -200,7 +200,7 @@ async function seedArchestraCatalogAndTools(): Promise<void> {
  * Each user gets their own personal Playwright server instance when they click the Browser button.
  */
 async function seedPlaywrightCatalog(): Promise<void> {
-  const LEGACY_PLAYWRIGHT_MCP_SERVER_NAME = "playwright-browser";
+  const LEGACY_PLAYWRIGHT_MCP_SERVER_SLUG = "playwright-browser";
   const playwrightLocalConfig = {
     // Pinned to v0.0.64 digest because v0.0.67 renamed --no-sandbox to --no-chromium-sandbox
     // but the image entrypoint still uses --no-sandbox, causing immediate crashes.
@@ -245,29 +245,29 @@ async function seedPlaywrightCatalog(): Promise<void> {
   let existingCatalog = await InternalMcpCatalogModel.findById(
     PLAYWRIGHT_MCP_CATALOG_ID,
   );
-  const legacyCatalogByName = await InternalMcpCatalogModel.findByName(
-    LEGACY_PLAYWRIGHT_MCP_SERVER_NAME,
+  const legacyCatalogBySlug = await InternalMcpCatalogModel.findBySlug(
+    LEGACY_PLAYWRIGHT_MCP_SERVER_SLUG,
   );
 
   // One-time migration: remove legacy playwright catalog installations/resources.
-  // This runs only when the old catalog name is present in the environment.
+  // This runs only when the old catalog slug is present in the environment.
   if (
-    existingCatalog?.name === LEGACY_PLAYWRIGHT_MCP_SERVER_NAME ||
-    legacyCatalogByName
+    existingCatalog?.slug === LEGACY_PLAYWRIGHT_MCP_SERVER_SLUG ||
+    legacyCatalogBySlug
   ) {
     const catalogIdsToDelete = new Set<string>();
-    if (existingCatalog?.name === LEGACY_PLAYWRIGHT_MCP_SERVER_NAME) {
+    if (existingCatalog?.slug === LEGACY_PLAYWRIGHT_MCP_SERVER_SLUG) {
       catalogIdsToDelete.add(existingCatalog.id);
     }
-    if (legacyCatalogByName) {
-      catalogIdsToDelete.add(legacyCatalogByName.id);
+    if (legacyCatalogBySlug) {
+      catalogIdsToDelete.add(legacyCatalogBySlug.id);
     }
 
     for (const catalogId of catalogIdsToDelete) {
       const deleted = await InternalMcpCatalogModel.delete(catalogId);
       if (deleted) {
         logger.info(
-          { catalogId, legacyCatalogName: LEGACY_PLAYWRIGHT_MCP_SERVER_NAME },
+          { catalogId, legacyCatalogName: LEGACY_PLAYWRIGHT_MCP_SERVER_SLUG },
           "Removed legacy Playwright catalog and related installations/resources",
         );
       }
@@ -282,7 +282,8 @@ async function seedPlaywrightCatalog(): Promise<void> {
     .insert(schema.internalMcpCatalogTable)
     .values({
       id: PLAYWRIGHT_MCP_CATALOG_ID,
-      name: PLAYWRIGHT_MCP_SERVER_NAME,
+      slug: PLAYWRIGHT_MCP_SERVER_NAME,
+      displayName: PLAYWRIGHT_MCP_SERVER_NAME,
       description:
         "Browser automation for chat - each user gets their own isolated browser session",
       serverType: "local",
@@ -304,7 +305,7 @@ async function seedTestMcpServer(): Promise<void> {
     return;
   }
 
-  const existing = await InternalMcpCatalogModel.findByName(
+  const existing = await InternalMcpCatalogModel.findBySlug(
     "internal-dev-test-server",
   );
   if (existing) {
@@ -313,7 +314,8 @@ async function seedTestMcpServer(): Promise<void> {
   }
 
   await InternalMcpCatalogModel.create({
-    name: "internal-dev-test-server",
+    slug: "internal-dev-test-server",
+    displayName: "internal-dev-test-server",
     description:
       "Simple test MCP server for development. Has one tool that prints an env var.",
     serverType: "local",

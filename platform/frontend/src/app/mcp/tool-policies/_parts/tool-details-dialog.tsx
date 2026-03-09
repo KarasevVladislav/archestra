@@ -148,7 +148,7 @@ export function ToolDetailsDialog({
                           </Badge>
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p>{catalogItem?.name || "MCP Server"}</p>
+                          <p>{catalogItem?.displayName || "MCP Server"}</p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>

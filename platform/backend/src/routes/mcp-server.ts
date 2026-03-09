@@ -507,7 +507,7 @@ const mcpServerRoutes: FastifyPluginAsyncZod = async (fastify) => {
           try {
             // Capture catalogId before async callback to ensure it's available
             const capturedCatalogId = catalogItem.id;
-            const capturedCatalogName = catalogItem.name;
+            const capturedCatalogSlug = catalogItem.slug;
 
             // Set status to pending before starting the deployment
             await McpServerModel.update(mcpServer.id, {
@@ -566,7 +566,7 @@ const mcpServerRoutes: FastifyPluginAsyncZod = async (fastify) => {
 
                 // Persist tools in the database
                 // Use catalog item name (without userId) for tool naming to avoid duplicates across users
-                const toolNamePrefix = capturedCatalogName || mcpServer.name;
+                const toolNamePrefix = capturedCatalogSlug || mcpServer.name;
                 const toolsToCreate = tools.map((tool) => ({
                   name: ToolModel.slugifyName(toolNamePrefix, tool.name),
                   description: tool.description,

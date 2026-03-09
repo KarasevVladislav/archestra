@@ -122,7 +122,7 @@ class McpServerModel {
       .select({
         server: schema.mcpServersTable,
         ownerEmail: schema.usersTable.email,
-        catalogName: schema.internalMcpCatalogTable.name,
+        catalogSlug: schema.internalMcpCatalogTable.slug,
         teamName: schema.teamsTable.name,
         secretIsVault: schema.secretsTable.isVault,
         secretIsByosVault: schema.secretsTable.isByosVault,
@@ -205,7 +205,7 @@ class McpServerModel {
         serversMap.set(row.server.id, {
           ...row.server,
           ownerEmail: row.ownerEmail,
-          catalogName: row.catalogName,
+          catalogSlug: row.catalogSlug,
           users: [],
           userDetails: [],
           teamDetails,

@@ -174,7 +174,7 @@ const AgentToolsEditorContent = forwardRef<
       if (aCount === 0 && bCount > 0) return 1;
 
       // Finally, sort alphabetically by name
-      return a.name.localeCompare(b.name);
+      return a.displayName.localeCompare(b.displayName);
     });
   }, [catalogItems, assignedToolsByCatalog, toolCountByCatalog]);
 
@@ -203,7 +203,7 @@ const AgentToolsEditorContent = forwardRef<
       (q) => (q?.data as CatalogTool[] | undefined) ?? undefined,
     );
     const result = getDefaultArchestraToolIds(
-      catalogItems,
+      catalogItems.map((c) => ({ id: c.id, name: c.displayName })),
       toolsByCatalogIndex,
     );
     if (!result) return;
@@ -441,7 +441,7 @@ const AgentToolsEditorContent = forwardRef<
       const isDisabled = hasNoTools || hasNoCredentials;
       return {
         id: catalog.id,
-        name: catalog.name,
+        name: catalog.displayName,
         description: catalog.description || undefined,
         icon: (
           <McpCatalogIcon
@@ -586,7 +586,7 @@ function McpServerCard({
     >
       <McpCatalogIcon icon={catalog.icon} catalogId={catalog.id} size={24} />
       <span className="text-xs font-medium truncate w-full">
-        {catalog.name}
+        {catalog.displayName}
       </span>
       <span className="text-[10px] text-muted-foreground">
         {isDisabled
@@ -772,7 +772,7 @@ function McpServerPill({
               catalogId={catalogItem.id}
               size={14}
             />
-            <span className="font-medium">{catalogItem.name}</span>
+            <span className="font-medium">{catalogItem.displayName}</span>
             <span className="text-muted-foreground">({displayedCount})</span>
             <Pencil className="h-3 w-3 shrink-0 text-muted-foreground" />
           </Button>
@@ -786,7 +786,7 @@ function McpServerPill({
               e.stopPropagation();
               onRemove(catalogItem.id);
             }}
-            aria-label={`Remove ${catalogItem.name}`}
+            aria-label={`Remove ${catalogItem.displayName}`}
           >
             <X className="h-3 w-3" />
           </Button>
@@ -802,7 +802,7 @@ function McpServerPill({
       >
         <div className="p-4 border-b flex items-start justify-between gap-2 shrink-0">
           <div>
-            <h4 className="font-semibold">{catalogItem.name}</h4>
+            <h4 className="font-semibold">{catalogItem.displayName}</h4>
             {catalogItem.description && (
               <p className="text-sm text-muted-foreground mt-1">
                 {catalogItem.description}

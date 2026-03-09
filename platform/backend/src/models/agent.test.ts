@@ -1618,7 +1618,8 @@ describe("AgentModel", () => {
 
       const catalog = await makeInternalMcpCatalog({
         id: PLAYWRIGHT_MCP_CATALOG_ID,
-        name: "Playwright",
+        slug: "Playwright",
+        displayName: "Playwright",
         serverType: "builtin",
       });
 

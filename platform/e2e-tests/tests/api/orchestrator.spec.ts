@@ -83,7 +83,8 @@ test.describe("Orchestrator - MCP Server Installation and Execution", () => {
         // Use WIREMOCK_INTERNAL_URL because the backend needs to connect to WireMock
         // (In CI, backend runs in a K8s pod and needs the service DNS name)
         const catalogResponse = await createMcpCatalogItem(request, {
-          name: "Context7 - Remote",
+          slug: "Context7 - Remote",
+          displayName: "Context7 - Remote",
           description: "Context7 MCP Server for testing remote installation",
           serverType: "remote",
           serverUrl: `${WIREMOCK_INTERNAL_URL}/mcp/context7`,
@@ -193,7 +194,7 @@ test.describe("Orchestrator - MCP Server Installation and Execution", () => {
         if (!testServer) {
           // Install the MCP server with team assignment
           const installResponse = await installMcpServer(request, {
-            name: catalogItem.name,
+            name: catalogItem.slug,
             catalogId: catalogItem.id,
             teamId: defaultTeam.id,
             environmentValues: {
@@ -267,7 +268,8 @@ test.describe("Orchestrator - MCP Server Installation and Execution", () => {
 
         // Create a catalog item for context7 MCP server using Docker image
         const catalogResponse = await createMcpCatalogItem(request, {
-          name: "Context7 - Docker Based",
+          slug: "Context7 - Docker Based",
+          displayName: "Context7 - Docker Based",
           description:
             "Context7 MCP Server for testing Docker image installation",
           serverType: "local",

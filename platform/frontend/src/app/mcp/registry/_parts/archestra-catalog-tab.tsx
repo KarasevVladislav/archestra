@@ -114,7 +114,7 @@ export function ArchestraCatalogTab({
 
   // Create a Set of catalog item names for efficient lookup
   const catalogServerNames = useMemo(
-    () => new Set(catalogItems?.map((item) => item.name) || []),
+    () => new Set(catalogItems?.map((item) => item.slug) || []),
     [catalogItems],
   );
 

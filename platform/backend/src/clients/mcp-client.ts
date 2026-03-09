@@ -58,7 +58,7 @@ type McpToolWithServerMetadata = {
   executionSourceMcpServerId: string | null;
   useDynamicTeamCredential: boolean;
   catalogId: string | null;
-  catalogName: string | null;
+  catalogSlug: string | null;
 };
 
 /**
@@ -283,15 +283,15 @@ class McpClient {
         const client = await this.getOrCreateClient(connectionKey, transport);
 
         // Determine the actual tool name by stripping the server/catalog prefix.
-        // We prioritize the `catalogName` prefix, which is standard for local MCP servers.
+        // We prioritize the `catalogSlug` prefix, which is standard for local MCP servers.
         // If the tool name doesn't match the catalog prefix, we fall back to the resolved `mcpServerName`.
         let targetToolName = this.stripServerPrefix(
           toolCall.name,
-          tool.catalogName || "",
+          tool.catalogSlug || "",
         );
 
         if (targetToolName === toolCall.name) {
-          // No prefix match with catalogName; attempt to strip using mcpServerName instead.
+          // No prefix match with catalogSlug; attempt to strip using mcpServerName instead.
           targetToolName = this.stripServerPrefix(toolCall.name, mcpServerName);
         }
 
@@ -442,7 +442,7 @@ class McpClient {
             targetMcpServerId,
             tokenAuth,
             toolCatalogId: tool.catalogId,
-            toolCatalogName: tool.catalogName,
+            toolCatalogSlug: tool.catalogSlug,
             executeRetry: (getTransport, secrets) =>
               executeToolCall(getTransport, secrets, true),
           });
@@ -455,7 +455,7 @@ class McpClient {
 
         // For auth errors, return an actionable message with re-auth URL
         if (isAuthError && tool.catalogId) {
-          const catalogDisplayName = tool.catalogName || tool.catalogId;
+          const catalogDisplayName = tool.catalogSlug || tool.catalogId;
           // Credentials exist but failed → "expired/invalid" message with manage link
           if (targetMcpServerId) {
             return await this.createErrorResult(
@@ -706,7 +706,7 @@ class McpClient {
           toolCall,
           agentId,
           "Tool is missing catalogId",
-          tool.catalogName || "unknown",
+          tool.catalogSlug || "unknown",
         ),
       };
     }
@@ -719,7 +719,7 @@ class McpClient {
           toolCall,
           agentId,
           `No catalog item found for tool catalog ID ${tool.catalogId}`,
-          tool.catalogName || "unknown",
+          tool.catalogSlug || "unknown",
         ),
       };
     }
@@ -817,7 +817,7 @@ class McpClient {
     | { targetMcpServerId: string; mcpServerName: string }
     | { error: CommonToolResult }
   > {
-    const fallbackName = tool.catalogName || "unknown";
+    const fallbackName = tool.catalogSlug || "unknown";
     logger.info(
       {
         toolName: toolCall.name,
@@ -1015,7 +1015,7 @@ class McpClient {
     }
 
     // No server found - return an actionable error with install link
-    const catalogDisplayName = tool.catalogName || tool.catalogId;
+    const catalogDisplayName = tool.catalogSlug || tool.catalogId;
     return {
       error: await this.createErrorResult(
         toolCall,
@@ -1357,7 +1357,7 @@ class McpClient {
     targetMcpServerId: string;
     tokenAuth?: TokenAuthContext;
     toolCatalogId: string | null;
-    toolCatalogName: string | null;
+    toolCatalogSlug: string | null;
     executeRetry: (
       getTransport: () => Promise<Transport>,
       secrets: Record<string, unknown>,
@@ -1374,7 +1374,7 @@ class McpClient {
       targetMcpServerId,
       tokenAuth,
       toolCatalogId,
-      toolCatalogName,
+      toolCatalogSlug,
       executeRetry,
     } = params;
 
@@ -1456,7 +1456,7 @@ class McpClient {
         isAuthRelatedError(retryErrorMsg);
 
       if (isRetryAuthError && toolCatalogId) {
-        const catalogDisplayName = toolCatalogName || toolCatalogId;
+        const catalogDisplayName = toolCatalogSlug || toolCatalogId;
         return await this.createErrorResult(
           toolCall,
           agentId,
@@ -1661,7 +1661,7 @@ class McpClient {
         if (attempt < maxRetries) {
           logger.warn(
             { attempt, maxRetries, err: error },
-            `Failed to connect to MCP server ${catalogItem.name} (attempt ${attempt}/${maxRetries}). Retrying in ${retryDelayMs}ms...`,
+            `Failed to connect to MCP server ${catalogItem.slug} (attempt ${attempt}/${maxRetries}). Retrying in ${retryDelayMs}ms...`,
           );
           await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
           continue;
@@ -1669,14 +1669,14 @@ class McpClient {
 
         // Last attempt failed, throw error
         throw new Error(
-          `Failed to connect to MCP server ${catalogItem.name}: ${lastError.message}`,
+          `Failed to connect to MCP server ${catalogItem.slug}: ${lastError.message}`,
         );
       }
     }
 
     // Should never reach here, but TypeScript needs it
     throw new Error(
-      `Failed to connect to MCP server ${catalogItem.name}: ${
+      `Failed to connect to MCP server ${catalogItem.slug}: ${
         lastError?.message || "Unknown error"
       }`,
     );

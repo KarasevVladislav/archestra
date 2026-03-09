@@ -27,13 +27,13 @@ export function requiresNewUserInputForReinstall(
   oldCatalogItem: InternalMcpCatalog,
   newCatalogItem: InternalMcpCatalog,
 ): boolean {
-  // Local servers: check if name or prompted env vars changed
+  // Local servers: check if slug or prompted env vars changed
   if (newCatalogItem.serverType === "local") {
-    // 1. Check if name changed - affects secret paths
-    if (oldCatalogItem.name !== newCatalogItem.name) {
+    // 1. Check if slug changed - affects K8s deployment names and secret paths
+    if (oldCatalogItem.slug !== newCatalogItem.slug) {
       logger.info(
         { catalogId: newCatalogItem.id },
-        "Catalog name changed - manual reinstall required",
+        "Catalog slug changed - manual reinstall required",
       );
       return true;
     }
@@ -103,9 +103,9 @@ export async function autoReinstallServer(
     "Starting auto-reinstall of MCP server",
   );
 
-  // Reconstruct the correct server name from the current catalog name.
+  // Reconstruct the correct server name from the current catalog slug.
   const reconstructedName = McpServerModel.constructServerName({
-    baseName: catalogItem.name,
+    baseName: catalogItem.slug,
     serverType: server.serverType,
     ownerId: server.ownerId,
     teamId: server.teamId,
@@ -141,8 +141,8 @@ export async function autoReinstallServer(
   // Fetch and sync tools
   const tools = await McpServerModel.getToolsFromServer(server);
 
-  // Use catalog item name for tool naming (consistent with install flow)
-  const toolNamePrefix = catalogItem.name;
+  // Use catalog item slug for tool naming (consistent with install flow)
+  const toolNamePrefix = catalogItem.slug;
   const toolsToSync = tools.map((tool) => ({
     name: ToolModel.slugifyName(toolNamePrefix, tool.name),
     description: tool.description,

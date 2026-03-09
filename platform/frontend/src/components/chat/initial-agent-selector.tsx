@@ -630,7 +630,7 @@ function AssignedToolsGrid({
                 e.stopPropagation();
                 handleRemove(catalog.id);
               }}
-              title={`Remove ${catalog.name}`}
+              title={`Remove ${catalog.displayName}`}
             >
               <XIcon className="size-3" />
             </button>
@@ -645,7 +645,7 @@ function AssignedToolsGrid({
                 size={24}
               />
               <span className="text-xs font-medium truncate w-full">
-                {catalog.name}
+                {catalog.displayName}
               </span>
               <span className="text-[10px] text-muted-foreground">
                 {info?.count ?? 0} {(info?.count ?? 0) === 1 ? "tool" : "tools"}
@@ -722,7 +722,7 @@ function AddToolView({
       const lower = search.toLowerCase();
       items = items.filter(
         (c) =>
-          c.name.toLowerCase().includes(lower) ||
+          c.displayName.toLowerCase().includes(lower) ||
           c.description?.toLowerCase().includes(lower),
       );
     }
@@ -817,7 +817,7 @@ function AddToolView({
                     size={28}
                   />
                   <span className="text-sm font-medium truncate w-full">
-                    {catalog.name}
+                    {catalog.displayName}
                   </span>
                   {catalog.description && (
                     <p className="text-xs text-muted-foreground line-clamp-2 w-full">
@@ -870,7 +870,7 @@ function AddToolView({
         onOpenChange={(open) => {
           if (!open) installer.closeOAuth();
         }}
-        serverName={installer.selectedCatalogItem?.name || ""}
+        serverName={installer.selectedCatalogItem?.displayName || ""}
         onConfirm={installer.handleOAuthConfirm}
         onCancel={installer.closeOAuth}
         catalogId={installer.selectedCatalogItem?.id}
@@ -1025,7 +1025,7 @@ function ConfigureToolView({
 
   return (
     <div className="flex flex-col h-full">
-      <DialogHeader title={catalog.name} onBack={onBack} />
+      <DialogHeader title={catalog.displayName} onBack={onBack} />
 
       <div className="flex flex-col flex-1 min-h-0">
         {showCredentialSelector && (
@@ -1437,7 +1437,7 @@ function ToolServerAvatarGroup({
     ...catalogs.map((c) => ({
       key: c.id,
       icon: <McpCatalogIcon icon={c.icon} catalogId={c.id} size={12} />,
-      tooltip: c.name,
+      tooltip: c.displayName,
     })),
   ];
 

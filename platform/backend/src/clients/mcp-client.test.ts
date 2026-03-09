@@ -93,7 +93,8 @@ describe("McpClient", () => {
 
     // Create catalog entry for the MCP server
     const catalogItem = await InternalMcpCatalogModel.create({
-      name: "github-mcp-server",
+      slug: "github-mcp-server",
+      displayName: "github-mcp-server",
       serverType: "remote",
       serverUrl: "https://api.githubcopilot.com/mcp/",
     });
@@ -643,7 +644,8 @@ describe("McpClient", () => {
 
         // Create catalog entry for local streamable-http server
         const localCatalog = await InternalMcpCatalogModel.create({
-          name: "local-streamable-http-server",
+          slug: "local-streamable-http-server",
+          displayName: "local-streamable-http-server",
           serverType: "local",
           localConfig: {
             command: "npx",
@@ -932,8 +934,8 @@ describe("McpClient", () => {
         }
       });
 
-      test("strips catalogName prefix when mcpServerName includes userId suffix (Issue #1179)", async () => {
-        // Create tool with catalogName prefix (how local server tools are actually created)
+      test("strips catalogSlug prefix when mcpServerName includes userId suffix (Issue #1179)", async () => {
+        // Create tool with catalogSlug prefix (how local server tools are actually created)
         const tool = await ToolModel.createToolIfNotExists({
           name: "local-streamable-http-server__prefix_test_tool",
           description: "Tool for testing prefix stripping fallback",
@@ -963,7 +965,7 @@ describe("McpClient", () => {
 
         const result = await mcpClient.executeToolCall(toolCall, agentId);
 
-        // Verify the tool was called with just the tool name (stripped using catalogName)
+        // Verify the tool was called with just the tool name (stripped using catalogSlug)
         expect(mockCallTool).toHaveBeenCalledWith({
           name: "prefix_test_tool",
           arguments: {},
@@ -976,10 +978,11 @@ describe("McpClient", () => {
         });
       });
 
-      test("falls back to stripping mcpServerName when catalogName prefix is missing", async () => {
+      test("falls back to stripping mcpServerName when catalogSlug prefix is missing", async () => {
         // Create catalog with different name to ensure catalog prefix doesn't match
         const otherCatalog = await InternalMcpCatalogModel.create({
-          name: "other-catalog",
+          slug: "other-catalog",
+          displayName: "other-catalog",
           serverType: "local",
         });
 
@@ -1101,7 +1104,8 @@ describe("McpClient", () => {
 
         // Create a separate catalog + tool for dynamic credential testing
         const dynCatalog = await InternalMcpCatalogModel.create({
-          name: "jira-mcp-server",
+          slug: "jira-mcp-server",
+          displayName: "jira-mcp-server",
           serverType: "remote",
           serverUrl: "https://mcp.atlassian.com/v1/mcp",
         });
@@ -1169,7 +1173,8 @@ describe("McpClient", () => {
 
         // Create catalog + tool
         const dynCatalog = await InternalMcpCatalogModel.create({
-          name: "jira-team-server",
+          slug: "jira-team-server",
+          displayName: "jira-team-server",
           serverType: "remote",
           serverUrl: "https://mcp.atlassian.com/v1/mcp",
         });
@@ -1230,7 +1235,8 @@ describe("McpClient", () => {
 
         // Create catalog + server owned by serverOwner
         const dynCatalog = await InternalMcpCatalogModel.create({
-          name: "slack-mcp-server",
+          slug: "slack-mcp-server",
+          displayName: "slack-mcp-server",
           serverType: "remote",
           serverUrl: "https://mcp.slack.com/v1/mcp",
         });
@@ -1303,7 +1309,8 @@ describe("McpClient", () => {
 
         // Create an OAuth-enabled catalog
         const oauthCatalog = await InternalMcpCatalogModel.create({
-          name: "github-oauth-server",
+          slug: "github-oauth-server",
+          displayName: "github-oauth-server",
           serverType: "remote",
           serverUrl: "https://api.githubcopilot.com/mcp/",
           oauthConfig: {
@@ -1383,7 +1390,8 @@ describe("McpClient", () => {
         });
 
         const oauthCatalog = await InternalMcpCatalogModel.create({
-          name: "github-http401-server",
+          slug: "github-http401-server",
+          displayName: "github-http401-server",
           serverType: "remote",
           serverUrl: "https://api.githubcopilot.com/mcp/",
           oauthConfig: {
@@ -1461,7 +1469,8 @@ describe("McpClient", () => {
 
         // Create catalog WITHOUT oauthConfig (PAT-based auth like GitHub)
         const nonOauthCatalog = await InternalMcpCatalogModel.create({
-          name: "private-api-server",
+          slug: "private-api-server",
+          displayName: "private-api-server",
           serverType: "remote",
           serverUrl: "https://private-api.example.com/mcp/",
         });
@@ -1528,7 +1537,8 @@ describe("McpClient", () => {
 
         // Non-OAuth catalog (like GitHub with PAT)
         const catalog = await InternalMcpCatalogModel.create({
-          name: "github-pat-server",
+          slug: "github-pat-server",
+          displayName: "github-pat-server",
           serverType: "remote",
           serverUrl: "https://api.githubcopilot.com/mcp/",
         });
@@ -1606,7 +1616,8 @@ describe("McpClient", () => {
         });
 
         const oauthCatalog = await InternalMcpCatalogModel.create({
-          name: "github-team-oauth-server",
+          slug: "github-team-oauth-server",
+          displayName: "github-team-oauth-server",
           serverType: "remote",
           serverUrl: "https://api.githubcopilot.com/mcp/",
           oauthConfig: {
@@ -1683,7 +1694,8 @@ describe("McpClient", () => {
         });
 
         const localCatalog = await InternalMcpCatalogModel.create({
-          name: "stale-session-server",
+          slug: "stale-session-server",
+          displayName: "stale-session-server",
           serverType: "local",
           localConfig: {
             dockerImage: "mcr.microsoft.com/playwright/mcp",

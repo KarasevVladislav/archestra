@@ -44,7 +44,8 @@ test.describe("MCP Gateway - Auth at Call Time", () => {
     }) => {
       // 1. Create remote catalog item pointing to WireMock (static stubs pre-loaded)
       const catalogResponse = await createMcpCatalogItem(request, {
-        name: CATALOG_NAME,
+        slug: CATALOG_NAME,
+        displayName: CATALOG_NAME,
         description: "Test server for auth-at-call-time e2e test",
         serverType: "remote",
         serverUrl: `${WIREMOCK_INTERNAL_URL}${WIREMOCK_MCP_PATH}`,

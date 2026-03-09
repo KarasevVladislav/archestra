@@ -203,7 +203,8 @@ test.describe("Built-In Agents API", () => {
 
     const serverName = `auto-config-route-test-${Date.now()}`;
     const catalogResponse = await createMcpCatalogItem(request, {
-      name: serverName,
+      slug: serverName,
+      displayName: serverName,
       description: "Test server for auto-configure route e2e test",
       serverType: "remote",
       serverUrl: `${WIREMOCK_INTERNAL_URL}/mcp/context7`,
@@ -211,7 +212,7 @@ test.describe("Built-In Agents API", () => {
     const catalogItem = await catalogResponse.json();
 
     const serverResponse = await installMcpServer(request, {
-      name: catalogItem.name,
+      name: catalogItem.slug,
       catalogId: catalogItem.id,
       teamId: defaultTeam?.id,
     });
@@ -330,7 +331,8 @@ test.describe("Built-In Agents API", () => {
 
     const serverName = `policy-config-assign-test-${Date.now()}`;
     const catalogResponse = await createMcpCatalogItem(request, {
-      name: serverName,
+      slug: serverName,
+      displayName: serverName,
       description: "Test server for auto-configure assignment e2e test",
       serverType: "remote",
       serverUrl: `${WIREMOCK_INTERNAL_URL}/mcp/context7`,
@@ -341,7 +343,7 @@ test.describe("Built-In Agents API", () => {
     try {
       // 3. Install MCP server WITHOUT agentIds — tools are created but not assigned
       const serverResponse = await installMcpServer(request, {
-        name: catalogItem.name,
+        name: catalogItem.slug,
         catalogId: catalogItem.id,
         teamId: defaultTeam?.id,
       });

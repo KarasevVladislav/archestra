@@ -18,6 +18,11 @@ class InternalMcpCatalogModel {
   ): Promise<InternalMcpCatalog> {
     const { labels, teams, ...dbValues } = catalogItem;
 
+    // Ensure slug is unique by appending a short suffix if a duplicate exists
+    dbValues.slug = await InternalMcpCatalogModel.ensureUniqueSlug(
+      dbValues.slug,
+    );
+
     const insertValues = {
       ...dbValues,
       ...(context?.organizationId
@@ -108,7 +113,8 @@ class InternalMcpCatalogModel {
     let dbItems: Array<typeof schema.internalMcpCatalogTable.$inferSelect>;
 
     const searchCondition = or(
-      ilike(schema.internalMcpCatalogTable.name, `%${query}%`),
+      ilike(schema.internalMcpCatalogTable.slug, `%${query}%`),
+      ilike(schema.internalMcpCatalogTable.displayName, `%${query}%`),
       ilike(schema.internalMcpCatalogTable.description, `%${query}%`),
     );
 
@@ -239,11 +245,11 @@ class InternalMcpCatalogModel {
     return result;
   }
 
-  static async findByName(name: string): Promise<InternalMcpCatalog | null> {
+  static async findBySlug(slug: string): Promise<InternalMcpCatalog | null> {
     const [dbItem] = await db
       .select()
       .from(schema.internalMcpCatalogTable)
-      .where(eq(schema.internalMcpCatalogTable.name, name));
+      .where(eq(schema.internalMcpCatalogTable.slug, slug));
 
     if (!dbItem) {
       return null;
@@ -485,6 +491,25 @@ class InternalMcpCatalogModel {
       labels: labelsMap.get(item.id) || [],
       teams: teamsMap.get(item.id) || [],
     }));
+  }
+
+  /**
+   * Ensure slug is unique. If a catalog item with the same slug already exists,
+   * append a short random suffix (first 8 chars of a UUID).
+   */
+  private static async ensureUniqueSlug(slug: string): Promise<string> {
+    const existing = await db
+      .select({ id: schema.internalMcpCatalogTable.id })
+      .from(schema.internalMcpCatalogTable)
+      .where(eq(schema.internalMcpCatalogTable.slug, slug))
+      .limit(1);
+
+    if (existing.length === 0) {
+      return slug;
+    }
+
+    const suffix = crypto.randomUUID().substring(0, 4);
+    return `${slug}-${suffix}`;
   }
 
   /**

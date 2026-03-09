@@ -480,7 +480,7 @@ test.describe("MCP Gateway - External MCP Server Tests", () => {
       if (!testServer) {
         // Install the server with team assignment
         const installResponse = await installMcpServer(request, {
-          name: catalogItem.name,
+          name: catalogItem.slug,
           catalogId: catalogItem.id,
           teamId: defaultTeam.id,
           environmentValues: {

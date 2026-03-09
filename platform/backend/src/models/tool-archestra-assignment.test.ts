@@ -90,7 +90,8 @@ describe("Archestra Tools Dynamic Assignment", () => {
 
     // Create an MCP server tool
     const catalogItem = await makeInternalMcpCatalog({
-      name: "test-mcp-server",
+      slug: "test-mcp-server",
+      displayName: "test-mcp-server",
       serverUrl: "https://test.com/mcp/",
     });
 

@@ -321,7 +321,7 @@ export function LocalServerInstallDialog({
               : isReinstall
                 ? "Reinstall"
                 : "Install"}{" "}
-            - {catalogItem?.name}
+            - {catalogItem?.displayName}
           </DialogTitle>
           {catalogItem?.instructions && (
             <DialogDescription asChild>

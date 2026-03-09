@@ -114,7 +114,7 @@ function LimitInlineForm({
   onSave,
   onCancel,
   teams,
-  mcpServers,
+  catalogItems,
   tokenPrices,
   hasOrganizationMcpLimit,
   getTeamsWithMcpLimits,
@@ -125,7 +125,7 @@ function LimitInlineForm({
   onSave: (data: archestraApiTypes.CreateLimitData["body"]) => void;
   onCancel: () => void;
   teams: TeamData[];
-  mcpServers: CatalogItem[];
+  catalogItems: CatalogItem[];
   tokenPrices: TokenPriceData[];
   hasOrganizationMcpLimit?: (mcpServerName?: string) => boolean;
   getTeamsWithMcpLimits?: (mcpServerName?: string) => string[];
@@ -257,31 +257,31 @@ function LimitInlineForm({
                     <SelectValue placeholder="Select an MCP server" />
                   </SelectTrigger>
                   <SelectContent>
-                    {mcpServers.length === 0 ? (
+                    {catalogItems.length === 0 ? (
                       <div className="px-2 py-1.5 text-sm text-muted-foreground">
                         No MCP servers available
                       </div>
                     ) : (
-                      mcpServers.map((server) => {
+                      catalogItems.map((server) => {
                         // For MCP limits, check if this server already has a limit for the selected entity
                         const isDisabled =
                           limitType === "mcp_server_calls" &&
                           ((formData.entityType === "organization" &&
-                            hasOrganizationMcpLimit?.(server.name)) ||
+                            hasOrganizationMcpLimit?.(server.slug)) ||
                             (formData.entityType === "team" &&
                               formData.entityId &&
                               formData.entityId.trim() !== "" &&
-                              getTeamsWithMcpLimits?.(server.name)?.includes(
+                              getTeamsWithMcpLimits?.(server.slug)?.includes(
                                 formData.entityId,
                               )));
 
                         return (
                           <SelectItem
                             key={server.id}
-                            value={server.name}
+                            value={server.slug}
                             disabled={Boolean(isDisabled)}
                           >
-                            {server.name}
+                            {server.displayName}
                           </SelectItem>
                         );
                       })
@@ -438,7 +438,7 @@ function LimitRow({
   onCancel,
   onDelete,
   teams,
-  mcpServers,
+  catalogItems,
   tokenPrices,
   getEntityName,
   getUsageStatus,
@@ -451,7 +451,7 @@ function LimitRow({
   onCancel: () => void;
   onDelete: () => void;
   teams: TeamData[];
-  mcpServers: CatalogItem[];
+  catalogItems: CatalogItem[];
   tokenPrices: TokenPriceData[];
   getEntityName: (limit: LimitData) => string;
   getUsageStatus: (
@@ -481,7 +481,7 @@ function LimitRow({
         onSave={onSave}
         onCancel={onCancel}
         teams={teams}
-        mcpServers={mcpServers}
+        catalogItems={catalogItems}
         tokenPrices={tokenPrices}
         organizationId={organizationId}
       />
@@ -611,7 +611,7 @@ export default function LimitsPage() {
 
   // Data fetching hooks
   const { data: limits = [], isLoading: limitsLoading } = useLimits();
-  const { data: mcpServers = [] } = useInternalMcpCatalog();
+  const { data: catalogItems = [] } = useInternalMcpCatalog();
   const { data: teams = [] } = useTeams();
   const { data: organizationDetails } = useOrganization();
   const { data: modelsWithApiKeys = [] } = useModelsWithApiKeys();
@@ -762,7 +762,7 @@ export default function LimitsPage() {
                     onSave={handleCreateLimit}
                     onCancel={handleCancelEdit}
                     teams={teams}
-                    mcpServers={mcpServers}
+                    catalogItems={catalogItems}
                     tokenPrices={tokenPrices}
                     organizationId={organizationDetails?.id || ""}
                   />
@@ -791,7 +791,7 @@ export default function LimitsPage() {
                       onCancel={handleCancelEdit}
                       onDelete={() => handleDeleteLimit(limit.id)}
                       teams={teams}
-                      mcpServers={mcpServers}
+                      catalogItems={catalogItems}
                       tokenPrices={tokenPrices}
                       getEntityName={getEntityName}
                       getUsageStatus={getUsageStatus}

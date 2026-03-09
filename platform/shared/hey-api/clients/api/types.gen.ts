@@ -25391,7 +25391,8 @@ export type GetInternalMcpCatalogResponses = {
      */
     200: Array<{
         id: string;
-        name: string;
+        slug: string;
+        displayName: string;
         version: string | null;
         description: string | null;
         instructions: string | null;
@@ -25500,7 +25501,8 @@ export type GetInternalMcpCatalogResponse = GetInternalMcpCatalogResponses[keyof
 export type CreateInternalMcpCatalogItemData = {
     body: {
         id?: string;
-        name: string;
+        slug: string;
+        displayName: string;
         version?: string | null;
         description?: string | null;
         instructions?: string | null;
@@ -25668,7 +25670,8 @@ export type CreateInternalMcpCatalogItemResponses = {
      */
     200: {
         id: string;
-        name: string;
+        slug: string;
+        displayName: string;
         version: string | null;
         description: string | null;
         instructions: string | null;
@@ -25927,7 +25930,8 @@ export type GetInternalMcpCatalogItemResponses = {
      */
     200: {
         id: string;
-        name: string;
+        slug: string;
+        displayName: string;
         version: string | null;
         description: string | null;
         instructions: string | null;
@@ -26035,7 +26039,8 @@ export type GetInternalMcpCatalogItemResponse = GetInternalMcpCatalogItemRespons
 
 export type UpdateInternalMcpCatalogItemData = {
     body?: {
-        name?: string;
+        slug?: string;
+        displayName?: string;
         version?: string | null;
         description?: string | null;
         instructions?: string | null;
@@ -26205,7 +26210,8 @@ export type UpdateInternalMcpCatalogItemResponses = {
      */
     200: {
         id: string;
-        name: string;
+        slug: string;
+        displayName: string;
         version: string | null;
         description: string | null;
         instructions: string | null;
@@ -26401,16 +26407,16 @@ export type GetInternalMcpCatalogToolsResponses = {
 
 export type GetInternalMcpCatalogToolsResponse = GetInternalMcpCatalogToolsResponses[keyof GetInternalMcpCatalogToolsResponses];
 
-export type DeleteInternalMcpCatalogItemByNameData = {
+export type DeleteInternalMcpCatalogItemBySlugData = {
     body?: never;
     path: {
-        name: string;
+        slug: string;
     };
     query?: never;
-    url: '/api/internal_mcp_catalog/by-name/{name}';
+    url: '/api/internal_mcp_catalog/by-slug/{slug}';
 };
 
-export type DeleteInternalMcpCatalogItemByNameErrors = {
+export type DeleteInternalMcpCatalogItemBySlugErrors = {
     /**
      * Default Response
      */
@@ -26467,9 +26473,9 @@ export type DeleteInternalMcpCatalogItemByNameErrors = {
     };
 };
 
-export type DeleteInternalMcpCatalogItemByNameError = DeleteInternalMcpCatalogItemByNameErrors[keyof DeleteInternalMcpCatalogItemByNameErrors];
+export type DeleteInternalMcpCatalogItemBySlugError = DeleteInternalMcpCatalogItemBySlugErrors[keyof DeleteInternalMcpCatalogItemBySlugErrors];
 
-export type DeleteInternalMcpCatalogItemByNameResponses = {
+export type DeleteInternalMcpCatalogItemBySlugResponses = {
     /**
      * Default Response
      */
@@ -26478,7 +26484,7 @@ export type DeleteInternalMcpCatalogItemByNameResponses = {
     };
 };
 
-export type DeleteInternalMcpCatalogItemByNameResponse = DeleteInternalMcpCatalogItemByNameResponses[keyof DeleteInternalMcpCatalogItemByNameResponses];
+export type DeleteInternalMcpCatalogItemBySlugResponse = DeleteInternalMcpCatalogItemBySlugResponses[keyof DeleteInternalMcpCatalogItemBySlugResponses];
 
 export type GetDeploymentYamlPreviewData = {
     body?: never;
@@ -30876,7 +30882,7 @@ export type GetMcpServersResponses = {
         createdAt: string;
         updatedAt: string;
         ownerEmail?: string | null;
-        catalogName?: string | null;
+        catalogSlug?: string | null;
         users?: Array<string>;
         userDetails?: Array<{
             userId: string;
@@ -31002,7 +31008,7 @@ export type InstallMcpServerResponses = {
         createdAt: string;
         updatedAt: string;
         ownerEmail?: string | null;
-        catalogName?: string | null;
+        catalogSlug?: string | null;
         users?: Array<string>;
         userDetails?: Array<{
             userId: string;
@@ -31187,7 +31193,7 @@ export type GetMcpServerResponses = {
         createdAt: string;
         updatedAt: string;
         ownerEmail?: string | null;
-        catalogName?: string | null;
+        catalogSlug?: string | null;
         users?: Array<string>;
         userDetails?: Array<{
             userId: string;
@@ -31303,7 +31309,7 @@ export type ReauthenticateMcpServerResponses = {
         createdAt: string;
         updatedAt: string;
         ownerEmail?: string | null;
-        catalogName?: string | null;
+        catalogSlug?: string | null;
         users?: Array<string>;
         userDetails?: Array<{
             userId: string;
@@ -31670,7 +31676,7 @@ export type ReinstallMcpServerResponses = {
         createdAt: string;
         updatedAt: string;
         ownerEmail?: string | null;
-        catalogName?: string | null;
+        catalogSlug?: string | null;
         users?: Array<string>;
         userDetails?: Array<{
             userId: string;
@@ -36964,7 +36970,7 @@ export type GetToolsResponses = {
         } | null;
         catalog: {
             id: string;
-            name: string;
+            slug: string;
         } | null;
     }>;
 };

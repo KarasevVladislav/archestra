@@ -219,14 +219,15 @@ export function useReauthenticateMcpServer() {
   return useMutation({
     mutationFn: async (data: {
       id: string;
-      name: string;
+      slug: string;
+      displayName: string;
       secretId?: string;
       accessToken?: string;
       userConfigValues?: Record<string, string>;
       environmentValues?: Record<string, string>;
       isByosVault?: boolean;
     }) => {
-      const { id, name, ...body } = data;
+      const { id, slug, displayName, ...body } = data;
       const response = await reauthenticateMcpServer({
         path: { id },
         body,
@@ -240,10 +241,10 @@ export function useReauthenticateMcpServer() {
     onSuccess: async (_, variables) => {
       await queryClient.refetchQueries({ queryKey: ["mcp-servers"] });
       invalidateToolAssignmentQueries(queryClient);
-      toast.success(`Successfully re-authenticated ${variables.name}`);
+      toast.success(`Successfully re-authenticated ${variables.displayName}`);
     },
     onError: (_error, variables) => {
-      toast.error(`Failed to re-authenticate ${variables.name}`);
+      toast.error(`Failed to re-authenticate ${variables.displayName}`);
     },
   });
 }
@@ -258,12 +259,13 @@ export function useReinstallMcpServer() {
   return useMutation({
     mutationFn: async (data: {
       id: string;
-      name: string;
+      slug: string;
+      displayName: string;
       environmentValues?: Record<string, string>;
       isByosVault?: boolean;
       serviceAccount?: string;
     }) => {
-      const { id, name, ...body } = data;
+      const { id, slug, displayName, ...body } = data;
       const response = await reinstallMcpServer({
         path: { id },
         body,
@@ -272,7 +274,7 @@ export function useReinstallMcpServer() {
         handleApiError(response.error);
         return null;
       }
-      return { data: response.data, name };
+      return { data: response.data, displayName };
     },
     onSuccess: async (_result, variables) => {
       // Refetch servers to get updated status (will show "pending" initially)

@@ -251,7 +251,7 @@ export function RemoteServerInstallDialog({
               <span>
                 {isReauth ? "Re-authenticate" : "Install Server"}
                 <span className="text-muted-foreground ml-2 font-normal">
-                  {catalogItem.name}
+                  {catalogItem.displayName}
                 </span>
               </span>
             </div>

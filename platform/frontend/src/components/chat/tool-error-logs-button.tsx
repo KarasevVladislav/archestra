@@ -32,9 +32,9 @@ export function ToolErrorLogsButton({ toolName }: ToolErrorLogsButtonProps) {
     // Find servers where the catalog name matches the tool's server name prefix
     return allMcpServers
       .filter((server) => {
-        // Match by catalogName (which is the server name used in tool naming)
+        // Match by catalogSlug (which is the server name used in tool naming)
         return (
-          server.catalogName === mcpServerName && server.serverType === "local"
+          server.catalogSlug === mcpServerName && server.serverType === "local"
         );
       })
       .map((server) => ({

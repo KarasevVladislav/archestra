@@ -110,7 +110,8 @@ test.describe("SSRF Protection - NetworkPolicy for MCP Servers", () => {
 
       // Create a catalog item for the SSRF test MCP server
       const catalogResponse = await createMcpCatalogItem(request, {
-        name: serverName,
+        slug: serverName,
+        displayName: serverName,
         description:
           "MCP server for SSRF protection testing - has a tool that attempts outbound HTTP requests",
         serverType: "local",

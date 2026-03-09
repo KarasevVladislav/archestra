@@ -22,7 +22,8 @@ const internalMcpCatalogTable = pgTable(
   "internal_mcp_catalog",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    name: text("name").notNull(),
+    slug: text("slug").notNull().unique(),
+    displayName: text("display_name").notNull(),
     version: text("version"),
     description: text("description"),
     instructions: text("instructions"),
