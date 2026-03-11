@@ -278,7 +278,7 @@ export class JiraConnector extends BaseConnector {
             total: searchResult.total,
             hasMore,
           },
-          "Server batch fetched",
+          "Server batch fetchedDDD",
         );
 
         batchIndex++;
