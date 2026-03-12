@@ -736,9 +736,10 @@ These environment variables set the default base URL for each LLM provider. Per-
 ### MCP Apps Sandbox
 
 - **`ARCHESTRA_MCP_SANDBOX_PORT`** / **`NEXT_PUBLIC_ARCHESTRA_MCP_SANDBOX_PORT`** - Port for the MCP sandbox proxy server used for CSP isolation of MCP App iframes in chat.
-  - Default: `3001`
-  - Must differ from the main backend port
+  - Default: `3002`
+  - Must differ from the main backend port (9000) and MCP Catalog API dev port (3001)
   - Both variables must be set to the same value when overriding
+  - `NEXT_PUBLIC_` is a build-time env var — changing the port in Docker/Helm requires a frontend container rebuild
 
 Origin restriction for the sandbox is driven by **`ARCHESTRA_FRONTEND_URL`** and **`ARCHESTRA_AUTH_ADDITIONAL_TRUSTED_ORIGINS`** (the same variables that control CORS and trusted origins for the main backend). When either variable is set, only those origins may embed the sandbox iframe and communicate with it via `postMessage`. When neither is set (local development), all origins are accepted.
 
