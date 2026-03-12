@@ -28,7 +28,7 @@ Run the platform with a single command:
 
 ```bash
 docker pull archestra/platform:latest;
-docker run -p 9000:9000 -p 3000:3000 \
+docker run -p 9000:9000 -p 3000:3000 -p 3001:3001 \
    -e ARCHESTRA_QUICKSTART=true \
    -v /var/run/docker.sock:/var/run/docker.sock \
    -v archestra-postgres-data:/var/lib/postgresql/data \
@@ -40,7 +40,7 @@ docker run -p 9000:9000 -p 3000:3000 \
 
 ```powershell
 docker pull archestra/platform:latest;
-docker run -p 9000:9000 -p 3000:3000 `
+docker run -p 9000:9000 -p 3000:3000 -p 3001:3001 `
    -e ARCHESTRA_QUICKSTART=true `
    -v /var/run/docker.sock:/var/run/docker.sock `
    -v archestra-postgres-data:/var/lib/postgresql/data `
@@ -52,6 +52,7 @@ This will start the platform with:
 
 - **Admin UI** available at <http://localhost:3000>
 - **API** available at <http://localhost:9000>
+- **MCP Apps Sandbox** available at <http://localhost:3001> (used by MCP App iframes)
 - **Auth Secret** auto-generated and saved to `/app/data/.auth_secret` (persisted across restarts)
 - **MCP Kubernetes Orchestrator** via KinD
 
@@ -62,7 +63,7 @@ This will start the platform with:
 If you have Kubernetes installed locally, you can use it for the MCP orchestrator. Make sure `kubectl` points to the right cluster and run the container without the socket and without `ARCHESTRA_QUICKSTART`. The orchestrator will create a cluster in the current context. See [Development with Standalone Kubernetes](./platform-orchestrator#local-development-with-docker-and-standalone-kubernetes)
 
 ```diff
-docker run -p 9000:9000 -p 3000:3000 \
+docker run -p 9000:9000 -p 3000:3000 -p 3001:3001 \
 -  -e ARCHESTRA_QUICKSTART=true \
 -  -v /var/run/docker.sock:/var/run/docker.sock \
    -v archestra-postgres-data:/var/lib/postgresql/data \
@@ -774,6 +775,15 @@ These environment variables set the default base URL for each LLM provider. Per-
   - Default: `anthropic`
   - Options: `anthropic`, `openai`, `gemini`
   - Used when no profile-specific provider is configured
+
+### MCP Apps Sandbox
+
+- **`ARCHESTRA_MCP_SANDBOX_PORT`** / **`NEXT_PUBLIC_ARCHESTRA_MCP_SANDBOX_PORT`** - Port for the MCP sandbox proxy server used for CSP isolation of MCP App iframes in chat.
+  - Default: `3001`
+  - Must differ from the main backend port
+  - Both variables must be set to the same value when overriding
+
+Origin restriction for the sandbox is driven by **`ARCHESTRA_FRONTEND_URL`** and **`ARCHESTRA_AUTH_ADDITIONAL_TRUSTED_ORIGINS`** (the same variables that control CORS and trusted origins for the main backend). When either variable is set, only those origins may embed the sandbox iframe and communicate with it via `postMessage`. When neither is set (local development), all origins are accepted.
 
 ### MCP Server Orchestrator
 

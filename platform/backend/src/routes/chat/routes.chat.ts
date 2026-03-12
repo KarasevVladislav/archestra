@@ -21,7 +21,11 @@ import { z } from "zod";
 import { archestraMcpBranding } from "@/archestra-mcp-server";
 import { hasAnyAgentTypeAdminPermission } from "@/auth";
 import { CacheKey, cacheManager } from "@/cache-manager";
-import { getChatMcpTools } from "@/clients/chat-mcp-client";
+import {
+  fetchToolUiResource,
+  getChatMcpTools,
+  getChatMcpToolUiResourceUris,
+} from "@/clients/chat-mcp-client";
 import {
   createDirectLLMModel,
   createLLMModelForAgent,
@@ -180,21 +184,24 @@ const chatRoutes: FastifyPluginAsyncZod = async (fastify) => {
       // Fetch MCP tools with enabled tool filtering
       // Pass undefined if no custom selection (use all tools)
       // Pass the actual array (even if empty) if there is custom selection
-      const mcpTools = await getChatMcpTools({
-        agentName: agent.name,
-        agentId,
-        userId: user.id,
-        userIsAgentAdmin,
-        enabledToolIds: hasCustomSelection ? enabledToolIds : undefined,
-        conversationId: conversation.id,
-        organizationId,
-        // Pass conversationId as sessionId to group all chat requests (including delegated agents) together
-        sessionId: conversation.id,
-        // Pass agentId as initial delegation chain (will be extended by delegated agents)
-        delegationChain: agentId,
-        abortSignal: chatAbortController.signal,
-        user: { id: user.id, email: user.email, name: user.name },
-      });
+      const [mcpTools, toolUiResourceUris] = await Promise.all([
+        getChatMcpTools({
+          agentName: agent.name,
+          agentId,
+          userId: user.id,
+          userIsAgentAdmin,
+          enabledToolIds: hasCustomSelection ? enabledToolIds : undefined,
+          conversationId: conversation.id,
+          organizationId,
+          // Pass conversationId as sessionId to group all chat requests (including delegated agents) together
+          sessionId: conversation.id,
+          // Pass agentId as initial delegation chain (will be extended by delegated agents)
+          delegationChain: agentId,
+          abortSignal: chatAbortController.signal,
+          user: { id: user.id, email: user.email, name: user.name },
+        }),
+        getChatMcpToolUiResourceUris(conversation.agentId),
+      ]);
 
       // Build system prompt from agent's systemPrompt field
       let systemPrompt: string | undefined;
@@ -217,11 +224,19 @@ const chatRoutes: FastifyPluginAsyncZod = async (fastify) => {
         promptContext,
       );
 
+      let toolResultInstructions: string
+      // Add MCP UI instruction when tools are available
+      if (Object.keys(mcpTools).length > 0) {
+        toolResultInstructions =
+          "When a tool result includes a UI resource, it means an interactive UI was rendered for the user. Respond with at most one brief sentence. Never describe, list, or explain what the UI shows.";
+
+      }
+
       const toolDenialInstruction =
         "When a tool execution is not approved by the user, do not retry it. Explain what happened and ask the user what they'd like to do instead.";
 
       systemPrompt =
-        [renderedPrompt, toolDenialInstruction].filter(Boolean).join("\n\n") ||
+        [renderedPrompt, toolDenialInstruction, toolResultInstructions].filter(Boolean).join("\n\n") ||
         undefined;
 
       // Use stored provider if available, otherwise detect from model name for backward compatibility
@@ -438,7 +453,7 @@ const chatRoutes: FastifyPluginAsyncZod = async (fastify) => {
                 //
                 // For successful requests, the first chunk arrives quickly
                 // and we proceed to merge the full stream to the client.
-                let result = streamText(streamTextConfig);
+                                let result = streamText(streamTextConfig);
 
                 // Try reading the first text chunk to detect immediate provider errors.
                 // Context-length errors fire before any tokens, so this catches them
@@ -490,7 +505,68 @@ const chatRoutes: FastifyPluginAsyncZod = async (fastify) => {
                   }
                 }
 
-                // Merge the stream text result into the UI message stream
+
+                // When the LLM invokes a tool that has a UI resource, fetch
+                // the HTML on demand and emit a data-tool-ui-start SSE event so
+                // the frontend can render the MCP App iframe immediately without
+                // a second HTTP request.
+                streamTextConfig.onChunk = ({ chunk }) => {
+                  if (chunk.type === "tool-input-start" && chunk.toolName) {
+                    if (!conversation.agentId) {
+                      throw new ApiError(
+                        500,
+                        "Conversation agent ID not found",
+                      );
+                    }
+                    const uiResourceUri = toolUiResourceUris[chunk.toolName];
+                    if (uiResourceUri) {
+                      const toolCallId = chunk.id;
+                      const toolName = chunk.toolName;
+                      fetchToolUiResource({
+                        agentId: conversation.agentId,
+                        userId: user.id,
+                        organizationId,
+                        userIsAgentAdmin,
+                        conversationId: conversation.id,
+                        toolName,
+                        uri: uiResourceUri,
+                      })
+                        .then((resource) => {
+                          // Cap HTML in SSE to 1 MB; larger payloads are
+                          // fetched on demand by the frontend via the MCP proxy.
+                          const MAX_SSE_HTML_BYTES = 1024 * 1024;
+                          const html =
+                            resource?.html &&
+                            Buffer.byteLength(resource.html) <=
+                            MAX_SSE_HTML_BYTES
+                              ? resource.html
+                              : undefined;
+                          try {
+                            writer.write({
+                              type: "data-tool-ui-start",
+                              data: {
+                                toolCallId,
+                                toolName,
+                                uiResourceUri,
+                                html,
+                                csp: resource?.csp,
+                                permissions: resource?.permissions,
+                              },
+                            });
+                          } catch {
+                            // Stream may have closed before the async fetch completed
+                          }
+                        })
+                        .catch((err) => {
+                          logger.debug(
+                            { err, toolName },
+                            "Failed to fetch UI resource for SSE",
+                          );
+                        });
+                    }
+                  }
+                };
+
                 writer.merge(
                   result.toUIMessageStream({
                     originalMessages: messages as UIMessage[],

@@ -732,6 +732,17 @@ const config = {
   vault: {
     token: process.env.ARCHESTRA_HASHICORP_VAULT_TOKEN || DEFAULT_VAULT_TOKEN,
   },
+  mcpSandbox: {
+    port: Number(process.env.ARCHESTRA_MCP_SANDBOX_PORT) || 3001,
+    /** Path to the sandbox proxy HTML file (co-located in backend static dir). */
+    filePath: path.resolve(__dirname, "static/mcp-sandbox-proxy.html"),
+    /**
+     * Explicitly configured origins that are allowed to embed the sandbox iframe.
+     * Empty array means no restriction (open / dev deployment).
+     * Mirrors the CORS/trusted-origin configuration so all three stay in sync.
+     */
+    allowedOrigins: addLoopbackEquivalents(getConfiguredOrigins()),
+  },
   observability: {
     otel: {
       captureContent: process.env.ARCHESTRA_OTEL_CAPTURE_CONTENT !== "false",

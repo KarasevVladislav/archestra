@@ -1,6 +1,20 @@
 import { randomUUID } from "node:crypto";
+import {
+  type ClientCapabilitiesWithExtensions,
+  UI_EXTENSION_CAPABILITIES,
+} from "@mcp-ui/client";
+import {
+  type McpUiResourceCsp,
+  type McpUiResourcePermissions,
+  type McpUiToolMeta,
+  RESOURCE_MIME_TYPE,
+} from "@modelcontextprotocol/ext-apps";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import type {
+  ContentBlock,
+  EmbeddedResource,
+} from "@modelcontextprotocol/sdk/types.js";
 import {
   isAgentTool,
   isBrowserMcpTool,
@@ -16,6 +30,7 @@ import {
 } from "@/archestra-mcp-server";
 import { CacheKey, LRUCacheManager } from "@/cache-manager";
 import mcpClient from "@/clients/mcp-client";
+import config from "@/config";
 import logger from "@/logging";
 import {
   AgentTeamModel,
@@ -34,10 +49,17 @@ import {
 import type { AgentType, GlobalToolPolicy } from "@/types";
 
 /**
- * MCP Gateway base URL (internal)
- * Chat connects to the new MCP Gateway endpoint with profile ID in path
+ * MIME types that indicate a renderable UI resource (SEP-1865).
+ * `text/html;profile=mcp-app` is the canonical type per the spec;
  */
-const MCP_GATEWAY_BASE_URL = "http://localhost:9000/v1/mcp";
+const RENDERABLE_UI_MIME_TYPES = [RESOURCE_MIME_TYPE];
+
+/**
+ * MCP Gateway base URL (internal)
+ * Chat connects to the MCP Gateway endpoint with profile ID in path.
+ * Derives from the configured API port to work in multi-pod deployments.
+ */
+const MCP_GATEWAY_BASE_URL = `http://localhost:${config.api.port}/v1/mcp`;
 
 /**
  * Maximum client cache size to prevent unbounded memory growth.
@@ -211,8 +233,8 @@ export async function selectMCPGatewayToken(
     }
   }
 
-  // Get all team tokens
-  const tokens = await TeamTokenModel.findAll();
+  // Get all team tokens for this organization
+  const tokens = await TeamTokenModel.findAll(organizationId);
 
   // 2. If user is agent admin, use organization token (teamId is null)
   if (userIsAgentAdmin) {
@@ -480,6 +502,11 @@ export async function getChatMcpClient(
       },
     );
 
+    const capabilities: ClientCapabilitiesWithExtensions = {
+      roots: { listChanged: true },
+      extensions: UI_EXTENSION_CAPABILITIES,
+    };
+
     // Create MCP client
     const client = new Client(
       {
@@ -487,7 +514,7 @@ export async function getChatMcpClient(
         version: "1.0.0",
       },
       {
-        capabilities: {},
+        capabilities,
       },
     );
 
@@ -722,8 +749,16 @@ export async function getChatMcpTools({
     logger.info({ agentId, userId }, "MCP client available, listing tools...");
     const { tools: mcpTools } = await client.listTools();
 
-    // Filter out agent skills (tools starting with "agent__")
-    const filteredMcpTools = mcpTools.filter((tool) => !isAgentTool(tool.name));
+    // Filter out agent skills and app-only tools.
+    // Tools with _meta.ui.visibility that does not include "model" are intended
+    // for app-iframe use only and must not appear in the LLM's tool list.
+    // Default (no visibility field) = visible to both model and app.
+    const filteredMcpTools = mcpTools.filter((tool) => {
+      if (isAgentTool(tool.name)) return false;
+      const uiVisibility = (tool._meta as { ui?: McpUiToolMeta } | undefined)
+        ?.ui?.visibility;
+      return !(uiVisibility && !uiVisibility.includes("model"));
+    });
 
     logger.info(
       {
@@ -820,14 +855,9 @@ export async function getChatMcpTools({
 
                     // Check for errors
                     if (archestraResponse.isError) {
-                      const errorText = (
-                        archestraResponse.content as Array<{
-                          type: string;
-                          text?: string;
-                        }>
-                      )
+                      const errorText = archestraResponse.content
                         .map((item) =>
-                          item.type === "text" && item.text
+                          item.type === "text"
                             ? item.text
                             : JSON.stringify(item),
                         )
@@ -836,16 +866,9 @@ export async function getChatMcpTools({
                     }
 
                     // Convert MCP content to string for AI SDK
-                    return (
-                      archestraResponse.content as Array<{
-                        type: string;
-                        text?: string;
-                      }>
-                    )
+                    return archestraResponse.content
                       .map((item) =>
-                        item.type === "text" && item.text
-                          ? item.text
-                          : JSON.stringify(item),
+                        item.type === "text" ? item.text : JSON.stringify(item),
                       )
                       .join("\n");
                   }
@@ -889,6 +912,9 @@ export async function getChatMcpTools({
               },
             });
           },
+          // Strip UI-only fields (structuredContent, rawContent, _meta) so the LLM
+          // only receives the plain-text `content` summary (SEP-1865).
+          toModelOutput: mcpToolToModelOutput,
         };
       } catch (error) {
         logger.error(
@@ -1004,14 +1030,9 @@ export async function getChatMcpTools({
                     });
 
                     if (response.isError) {
-                      const errorText = (
-                        response.content as Array<{
-                          type: string;
-                          text?: string;
-                        }>
-                      )
+                      const errorText = response.content
                         .map((item) =>
-                          item.type === "text" && item.text
+                          item.type === "text"
                             ? item.text
                             : JSON.stringify(item),
                         )
@@ -1019,16 +1040,9 @@ export async function getChatMcpTools({
                       throw new Error(errorText);
                     }
 
-                    return (
-                      response.content as Array<{
-                        type: string;
-                        text?: string;
-                      }>
-                    )
+                    return response.content
                       .map((item) =>
-                        item.type === "text" && item.text
-                          ? item.text
-                          : JSON.stringify(item),
+                        item.type === "text" ? item.text : JSON.stringify(item),
                       )
                       .join("\n");
                   } catch (error) {
@@ -1094,6 +1108,123 @@ export async function getChatMcpTools({
 }
 
 /**
+ * Converts the rich output of `executeMcpTool` into a plain text model output.
+ * Strips UI-only fields (structuredContent, rawContent, _meta) so the LLM
+ * only receives the plain-text `content` summary (SEP-1865).
+ */
+export function mcpToolToModelOutput({
+  output,
+}: {
+  output:
+    | string
+    | {
+        content: string;
+        _meta?: unknown;
+        structuredContent?: unknown;
+        rawContent?: unknown;
+      };
+}): { type: "text"; value: string } {
+  return {
+    type: "text",
+    value: typeof output === "string" ? output : output.content,
+  };
+}
+
+/** Pre-fetched UI resource data delivered via `data-tool-ui-start` SSE events. */
+export interface ToolUiResourceData {
+  html: string;
+  csp?: McpUiResourceCsp;
+  permissions?: McpUiResourcePermissions;
+}
+
+/**
+ * Returns a map of tool name → UI resource URI for every MCP App tool assigned
+ * to an agent. Used to emit `data-tool-ui-start` SSE events as soon as a tool
+ * call begins streaming so the frontend can render the app iframe immediately.
+ */
+export async function getChatMcpToolUiResourceUris(
+  agentId: string,
+): Promise<Record<string, string>> {
+  try {
+    const tools = await ToolModel.getMcpToolsByAgent(agentId);
+    const result: Record<string, string> = {};
+    for (const tool of tools) {
+      const uriFromMeta = (
+        tool.meta as { _meta?: { ui?: McpUiToolMeta } } | undefined
+      )?._meta?.ui?.resourceUri;
+      if (uriFromMeta) {
+        result[tool.name] = uriFromMeta;
+      }
+    }
+    return result;
+  } catch (error) {
+    logger.debug({ error, agentId }, "Failed to fetch tool UI resource URIs");
+    return {};
+  }
+}
+
+/**
+ * Fetches the UI resource HTML for a single MCP App tool on demand.
+ *
+ * Called when `tool-input-start` fires for a tool that has a UI resource URI.
+ *
+ * @returns ToolUiResourceData if the resource was fetched successfully, null otherwise
+ */
+export async function fetchToolUiResource({
+  agentId,
+  userId,
+  organizationId,
+  userIsAgentAdmin,
+  conversationId,
+  toolName,
+  uri,
+}: {
+  agentId: string;
+  userId: string;
+  organizationId: string;
+  userIsAgentAdmin: boolean;
+  conversationId?: string;
+  toolName: string;
+  uri: string;
+}): Promise<ToolUiResourceData | null> {
+  const client = await getChatMcpClient(
+    agentId,
+    userId,
+    organizationId,
+    userIsAgentAdmin,
+    conversationId,
+  );
+  if (!client) return null;
+
+  try {
+    const resourceResult = await client.readResource({ uri });
+    const content = resourceResult.contents?.[0];
+    if (!content) return null;
+
+    const html =
+      "blob" in content && content.blob
+        ? Buffer.from(content.blob, "base64").toString("utf-8")
+        : (content as { text?: string }).text;
+
+    if (!html) return null;
+
+    type ContentUiMeta = {
+      csp?: McpUiResourceCsp;
+      permissions?: McpUiResourcePermissions;
+    };
+    const uiMeta = (content as { _meta?: { ui?: ContentUiMeta } })._meta?.ui;
+
+    return { html, csp: uiMeta?.csp, permissions: uiMeta?.permissions };
+  } catch (error) {
+    logger.debug(
+      { error, toolName, uri, agentId },
+      "Failed to fetch UI resource HTML",
+    );
+    return null;
+  }
+}
+
+/**
  * Context for MCP tool execution with browser sync support.
  */
 interface ToolExecutionContext {
@@ -1121,10 +1252,15 @@ interface ToolExecutionContext {
  * - Browser state sync (tabs and navigation)
  * - Content conversion to string format
  *
- * @returns The tool result as a string
+ * @returns The tool result as a string and metadata for the UI renderer
  * @throws Error if tool execution fails
  */
-async function executeMcpTool(ctx: ToolExecutionContext): Promise<string> {
+async function executeMcpTool(ctx: ToolExecutionContext): Promise<{
+  content: string;
+  _meta?: Record<string, unknown>;
+  structuredContent?: Record<string, unknown>;
+  rawContent?: ContentBlock[];
+}> {
   const {
     toolName,
     toolArguments,
@@ -1211,22 +1347,21 @@ async function executeMcpTool(ctx: ToolExecutionContext): Promise<string> {
   }
   throwIfAborted(abortSignal);
 
+  // The MCP path always returns ContentBlock[] in content — narrow from unknown.
+  const mcpContent = result.content as ContentBlock[];
+
   // Check if MCP tool returned an error
   // Return error text as tool result instead of throwing so the AI SDK includes
   // it in the conversation as a tool-result message. This allows the frontend to
   // parse structured errors (e.g. auth-required with install URL) and render
   // actionable UI instead of showing a generic stream error.
   if (result.isError) {
-    const extractedError = Array.isArray(result.content)
-      ? result.content
-          .map((item: { type: string; text?: string }) =>
-            item.type === "text" && item.text
-              ? item.text
-              : JSON.stringify(item),
-          )
-          .join("\n")
-      : null;
-    return extractedError || result.error || "Tool execution failed";
+    const extractedError = mcpContent
+      ?.map((item) => (item.type === "text" ? item.text : JSON.stringify(item)))
+      .join("\n");
+    return {
+      content: extractedError || result.error || "Tool execution failed",
+    };
   }
 
   // Sync browser state if needed
@@ -1256,20 +1391,108 @@ async function executeMcpTool(ctx: ToolExecutionContext): Promise<string> {
         agentId,
         conversationId,
         userContext: { userId, organizationId, userIsAgentAdmin },
-        toolResultContent: result.content,
+        toolResultContent: mcpContent,
       });
     }
   }
 
   // Convert MCP content to string for AI SDK
-  return (result.content as Array<{ type: string; text?: string }>)
-    .map((item: { type: string; text?: string }) => {
-      if (item.type === "text" && item.text) {
-        return item.text;
-      }
-      return JSON.stringify(item);
-    })
-    .join("\n");
+  // Handles standard content types: text, image, resource (embedded UI resources)
+  const hasRenderableUI = mcpContent.some(
+    (item) =>
+      item.type === "resource" &&
+      RENDERABLE_UI_MIME_TYPES.includes(item.resource.mimeType ?? ""),
+  );
+
+  let textContent: string;
+  if (hasRenderableUI) {
+    // When a UI is rendered, give the LLM almost nothing to work with.
+    // No data, no descriptions - just a terse confirmation. This prevents
+    // verbose LLM responses that describe or explain the already-visible UI.
+    textContent = "OK";
+  } else {
+    textContent = mcpContent
+      .map((item) => {
+        if (item.type === "text") {
+          return item.text;
+        }
+        if (item.type === "resource") {
+          if ("text" in item.resource) return item.resource.text;
+          return `[Resource: ${item.resource.uri}]`;
+        }
+        return JSON.stringify(item);
+      })
+      .join("\n");
+  }
+
+  // The _meta block from tool definitions, containing the ui sub-object (SEP-1865).
+  type ToolDefinitionMeta = { ui?: McpUiToolMeta; [key: string]: unknown };
+
+  // Fetch tool definition to get _meta.ui.resourceUri for MCP Apps
+  // Per SEP-1865, tool definitions declare _meta.ui.resourceUri to link tools to their UI
+  // The tools table stores: meta = { _meta: { ui: { resourceUri: "..." } }, annotations: {...} }
+  let toolDefinitionMeta: ToolDefinitionMeta | undefined;
+  try {
+    const toolDef = await ToolModel.findByName(toolName);
+    if (toolDef?.meta) {
+      // Extract _meta from the stored structure: { _meta: {...}, annotations: {...} }
+      toolDefinitionMeta = (toolDef.meta as { _meta?: ToolDefinitionMeta })
+        ?._meta;
+    }
+  } catch (error) {
+    logger.debug(
+      { error, toolName, agentId },
+      "Failed to fetch tool definition meta",
+    );
+  }
+
+  // Check for embedded resources (type: "resource" content items with UI resources)
+  // MCP servers can return UI resources inline in tool results as an alternative to
+  // declaring _meta.ui.resourceUri in tool definitions. Both patterns are standard MCP.
+  const resourceItems = mcpContent.filter(
+    (item): item is EmbeddedResource => item.type === "resource",
+  );
+  // Prefer renderable resources (text/html) over data resources (application/json, etc.)
+  const embeddedResourceItem =
+    resourceItems.find((item) =>
+      RENDERABLE_UI_MIME_TYPES.includes(item.resource.mimeType ?? ""),
+    ) ?? resourceItems[0];
+
+  if (embeddedResourceItem && !toolDefinitionMeta?.ui?.resourceUri) {
+    // Synthesize _meta.ui from the embedded resource so frontend can detect and render it
+    toolDefinitionMeta = {
+      ...toolDefinitionMeta,
+      ui: {
+        ...toolDefinitionMeta?.ui,
+        resourceUri: embeddedResourceItem.resource.uri,
+      },
+    };
+  }
+
+  // Merge tool definition meta with result meta (tool definition takes precedence for ui.resourceUri)
+  const mergedMeta = {
+    ...result._meta,
+    ...toolDefinitionMeta,
+  };
+
+  if (toolDefinitionMeta || result.structuredContent) {
+    logger.debug(
+      {
+        toolName,
+        hasToolDefinitionMeta: !!toolDefinitionMeta,
+        hasStructuredContent: !!result.structuredContent,
+        uiResourceUri: toolDefinitionMeta?.ui?.resourceUri,
+      },
+      "MCP Apps: Tool result with metadata for AppRenderer",
+    );
+  }
+
+  return {
+    content: textContent,
+    _meta: Object.keys(mergedMeta).length > 0 ? mergedMeta : undefined,
+    structuredContent: result.structuredContent,
+    rawContent: mcpContent,
+  };
 }
 
 /**

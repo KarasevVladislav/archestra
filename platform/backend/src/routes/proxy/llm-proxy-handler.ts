@@ -657,6 +657,7 @@ async function handleStreaming<
         const stream = await provider.executeStream(client, request);
 
         // Process chunks
+        let toolCallEventsFlushed = 0;
         for await (const chunk of stream) {
           // Track first chunk time
           if (!firstChunkTime) {
@@ -674,10 +675,25 @@ async function handleStreaming<
 
           const result = streamAdapter.processChunk(chunk);
 
-          // Stream non-tool-call data immediately
+          // Stream all data immediately — both text deltas and tool call
+          // chunks. Tool calls were previously buffered until policy
+          // evaluation completed, but this caused multi-second latency
+          // spikes for large tool-call payloads. Policies are still
+          // evaluated after the stream; if a tool call is blocked, a
+          // refusal message is appended to the stream.
           if (result.sseData) {
             ensureStreamHeaders();
             reply.raw.write(result.sseData);
+          } else if (result.isToolCallChunk) {
+            // Tool call chunks: use adapter's own SSE formatting (handles
+            // provider-specific formats like Anthropic's event: prefix).
+            // Write any new events since the last flush.
+            const allEvents = streamAdapter.getRawToolCallEvents();
+            ensureStreamHeaders();
+            for (let i = toolCallEventsFlushed; i < allEvents.length; i++) {
+              reply.raw.write(allEvents[i]);
+            }
+            toolCallEventsFlushed = allEvents.length;
           }
 
           if (result.isFinal) {
@@ -769,7 +785,8 @@ async function handleStreaming<
       const { contentMessage, reason, allToolCallNames } =
         toolInvocationRefusal;
 
-      // Stream refusal
+      // Tool call chunks were already streamed inline for low latency.
+      // Append a refusal text event so clients know not to execute them.
       ensureStreamHeaders();
       const refusalEvents = streamAdapter.formatCompleteTextSSE(contentMessage);
       for (const event of refusalEvents) {
@@ -788,19 +805,8 @@ async function handleStreaming<
         source,
         externalAgentId,
       });
-    } else if (toolCalls.length > 0) {
-      // Tool calls approved - stream raw events
-      logger.info(
-        { toolCallCount: toolCalls.length },
-        "Tool calls allowed, streaming them now",
-      );
-
-      ensureStreamHeaders();
-      const rawEvents = streamAdapter.getRawToolCallEvents();
-      for (const event of rawEvents) {
-        reply.raw.write(event);
-      }
     }
+    // Tool call chunks were already streamed inline — no flush needed.
 
     // Stream end events
     ensureStreamHeaders();
