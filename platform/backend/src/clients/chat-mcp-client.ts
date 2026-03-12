@@ -1440,9 +1440,10 @@ async function executeMcpTool(ctx: ToolExecutionContext): Promise<{
   // Fetch tool definition to get _meta.ui.resourceUri for MCP Apps
   // Per SEP-1865, tool definitions declare _meta.ui.resourceUri to link tools to their UI
   // The tools table stores: meta = { _meta: { ui: { resourceUri: "..." } }, annotations: {...} }
+  // Scoped to agent to prevent cross-org metadata leak (findByName is unscoped).
   let toolDefinitionMeta: ToolDefinitionMeta | undefined;
   try {
-    const toolDef = await ToolModel.findByName(toolName);
+    const toolDef = await ToolModel.findByNameForAgent(toolName, agentId);
     if (toolDef?.meta) {
       // Extract _meta from the stored structure: { _meta: {...}, annotations: {...} }
       toolDefinitionMeta = (toolDef.meta as { _meta?: ToolDefinitionMeta })

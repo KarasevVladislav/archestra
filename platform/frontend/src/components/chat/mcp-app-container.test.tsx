@@ -33,7 +33,7 @@ vi.mock("next-themes", () => ({
 }));
 
 vi.mock("@/lib/config", () => ({
-  getMcpSandboxBaseUrl: () => "http://localhost:3001",
+  getMcpSandboxBaseUrl: () => "http://localhost:3002",
 }));
 
 // ── Import component under test after mocks ───────────────────────────────────
