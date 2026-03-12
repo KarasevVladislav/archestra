@@ -67,6 +67,13 @@ spec:
       {{- if and (eq (.Values.archestra.service.type | default "ClusterIP") "NodePort") .Values.archestra.service.nodePorts.frontend }}
       nodePort: {{ .Values.archestra.service.nodePorts.frontend }}
       {{- end }}
+    - port: 3002
+      targetPort: sandbox
+      protocol: TCP
+      name: sandbox
+      {{- if and (eq (.Values.archestra.service.type | default "ClusterIP") "NodePort") .Values.archestra.service.nodePorts.sandbox }}
+      nodePort: {{ .Values.archestra.service.nodePorts.sandbox }}
+      {{- end }}
   selector:
     {{- include "archestra-platform.selectorLabels" . | nindent 4 }}
 ---
@@ -117,6 +124,9 @@ spec:
               protocol: TCP
             - name: frontend
               containerPort: 3000
+              protocol: TCP
+            - name: sandbox
+              containerPort: 3002
               protocol: TCP
           env:
             {{- include "archestra-platform.env" . | nindent 12 }}

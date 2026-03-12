@@ -94,6 +94,7 @@ archestra:
       backend: 30000
       metrics: 30050
       frontend: 30300
+      sandbox: 30302
 
 # PostgreSQL configuration for CI
 postgresql:

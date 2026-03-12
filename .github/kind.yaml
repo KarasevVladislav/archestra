@@ -17,6 +17,9 @@ nodes:
       - containerPort: 30300 # Frontend
         hostPort: 3000
         protocol: TCP
+      - containerPort: 30302 # MCP Apps Sandbox
+        hostPort: 3002
+        protocol: TCP
       - containerPort: 30080 # WireMock
         hostPort: 8080
         protocol: TCP

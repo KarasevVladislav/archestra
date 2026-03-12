@@ -33,6 +33,17 @@ tests:
             targetPort: frontend
             protocol: TCP
 
+  - it: should expose sandbox port 3002
+    documentIndex: 0
+    asserts:
+      - contains:
+          path: spec.ports
+          content:
+            name: sandbox
+            port: 3002
+            targetPort: sandbox
+            protocol: TCP
+
   - it: should expose metrics port 9050
     documentIndex: 0
     asserts:
@@ -195,6 +206,12 @@ tests:
       - equal:
           path: spec.template.spec.containers[0].ports[2].containerPort
           value: 3000
+      - equal:
+          path: spec.template.spec.containers[0].ports[3].name
+          value: sandbox
+      - equal:
+          path: spec.template.spec.containers[0].ports[3].containerPort
+          value: 3002
 
   - it: should set ARCHESTRA_DATABASE_URL to internal postgres when external_database_url is null
     documentIndex: 1
@@ -1232,6 +1249,8 @@ tests:
           path: spec.ports[1].nodePort
       - notExists:
           path: spec.ports[2].nodePort
+      - notExists:
+          path: spec.ports[3].nodePort
 
   - it: should not have nodePort fields when nodePorts values are null
     documentIndex: 0
@@ -1241,6 +1260,7 @@ tests:
         backend: null
         metrics: null
         frontend: null
+        sandbox: null
     asserts:
       - notExists:
           path: spec.ports[0].nodePort
@@ -1248,6 +1268,8 @@ tests:
           path: spec.ports[1].nodePort
       - notExists:
           path: spec.ports[2].nodePort
+      - notExists:
+          path: spec.ports[3].nodePort
 
   - it: should configure backend nodePort when specified
     documentIndex: 0
@@ -1263,6 +1285,8 @@ tests:
           path: spec.ports[1].nodePort
       - notExists:
           path: spec.ports[2].nodePort
+      - notExists:
+          path: spec.ports[3].nodePort
 
   - it: should configure metrics nodePort when specified
     documentIndex: 0
@@ -1278,6 +1302,8 @@ tests:
           value: 30050
       - notExists:
           path: spec.ports[2].nodePort
+      - notExists:
+          path: spec.ports[3].nodePort
 
   - it: should configure frontend nodePort when specified
     documentIndex: 0
@@ -1293,6 +1319,25 @@ tests:
       - equal:
           path: spec.ports[2].nodePort
           value: 30300
+      - notExists:
+          path: spec.ports[3].nodePort
+
+  - it: should configure sandbox nodePort when specified
+    documentIndex: 0
+    set:
+      archestra.service.type: NodePort
+      archestra.service.nodePorts:
+        sandbox: 30302
+    asserts:
+      - notExists:
+          path: spec.ports[0].nodePort
+      - notExists:
+          path: spec.ports[1].nodePort
+      - notExists:
+          path: spec.ports[2].nodePort
+      - equal:
+          path: spec.ports[3].nodePort
+          value: 30302
 
   - it: should configure all nodePorts when specified
     documentIndex: 0
@@ -1302,6 +1347,7 @@ tests:
         backend: 30000
         metrics: 30050
         frontend: 30300
+        sandbox: 30302
     asserts:
       - equal:
           path: spec.ports[0].nodePort
@@ -1312,6 +1358,9 @@ tests:
       - equal:
           path: spec.ports[2].nodePort
           value: 30300
+      - equal:
+          path: spec.ports[3].nodePort
+          value: 30302
 
   - it: should configure partial nodePorts when only some are specified
     documentIndex: 0
@@ -1329,6 +1378,8 @@ tests:
       - equal:
           path: spec.ports[2].nodePort
           value: 30300
+      - notExists:
+          path: spec.ports[3].nodePort
 
   # Health probes tests
   - it: should have startup probe configured

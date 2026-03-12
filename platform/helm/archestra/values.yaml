@@ -455,6 +455,7 @@ archestra:
       backend: null
       metrics: null
       frontend: null
+      sandbox: null
 
   # Ingress configuration
   ingress:
