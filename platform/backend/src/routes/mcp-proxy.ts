@@ -105,27 +105,42 @@ export const mcpProxyRoutes: FastifyPluginAsyncZod = async (fastify) => {
             id: body.id ?? null,
           };
         }
+        // Fail-closed: reject if tool not found in DB (e.g. dynamically registered
+        // tools that haven't been synced) to prevent visibility bypass.
         const tool = await ToolModel.findByNameForAgent(toolName, agentId);
-        if (tool) {
-          const toolMeta = tool.meta as
-            | { _meta?: { ui?: McpUiToolMeta } }
-            | undefined;
-          const visibility = toolMeta?._meta?.ui?.visibility;
-          if (visibility && !visibility.includes("app")) {
-            fastify.log.warn(
-              { agentId, toolName, visibility },
-              "MCP proxy: rejecting tools/call for app-invisible tool",
-            );
-            reply.status(200);
-            return {
-              jsonrpc: "2.0",
-              error: {
-                code: -32601,
-                message: `Tool "${toolName}" is not accessible from MCP Apps (visibility: [${visibility.join(", ")}])`,
-              },
-              id: body.id ?? null,
-            };
-          }
+        if (!tool) {
+          fastify.log.warn(
+            { agentId, toolName },
+            "MCP proxy: rejecting tools/call for unknown tool",
+          );
+          reply.status(200);
+          return {
+            jsonrpc: "2.0",
+            error: {
+              code: -32601,
+              message: `Tool "${toolName}" not found`,
+            },
+            id: body.id ?? null,
+          };
+        }
+        const toolMeta = tool.meta as
+          | { _meta?: { ui?: McpUiToolMeta } }
+          | undefined;
+        const visibility = toolMeta?._meta?.ui?.visibility;
+        if (visibility && !visibility.includes("app")) {
+          fastify.log.warn(
+            { agentId, toolName, visibility },
+            "MCP proxy: rejecting tools/call for app-invisible tool",
+          );
+          reply.status(200);
+          return {
+            jsonrpc: "2.0",
+            error: {
+              code: -32601,
+              message: `Tool "${toolName}" is not accessible from MCP Apps (visibility: [${visibility.join(", ")}])`,
+            },
+            id: body.id ?? null,
+          };
         }
       }
 
@@ -239,11 +254,11 @@ class McpServerCache {
   release(agentId: string, userId: string, server: McpServer): void {
     const key = `${agentId}:${userId}`;
     const entry = this.lru.get(key);
-    // Only release back if we still own the cache slot (no concurrent overwrite)
     if (entry && entry.server === server) {
       entry.inUse = false;
-    } else {
-      // First time or the entry was replaced — store as available
+    } else if (!entry) {
+      // Only cache on first use; discard stale instances when the slot was
+      // replaced by a fresh connection to avoid caching a broken server.
       this.lru.set(key, { server, inUse: false });
     }
   }

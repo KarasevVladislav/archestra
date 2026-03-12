@@ -509,6 +509,8 @@ const McpAppView = function McpAppView({
   onSendMessageRef.current = onSendMessage;
   // Ref to the latest bridge for teardown — avoids capturing a stale closure
   const latestBridgeRef = useRef<AppBridge | null>(null);
+  // Monotonic counter for JSON-RPC IDs to avoid collisions from Date.now() in rapid calls.
+  const rpcIdRef = useRef(0);
 
   // Create bridge + fetch HTML (once per agentId/resourceUri — callbacks via refs)
   // biome-ignore lint/correctness/useExhaustiveDependencies: callbacks accessed via stable refs
@@ -569,7 +571,7 @@ const McpAppView = function McpAppView({
         },
         body: JSON.stringify({
           jsonrpc: "2.0",
-          id: Date.now(),
+          id: ++rpcIdRef.current,
           method,
           params,
         }),
@@ -594,11 +596,46 @@ const McpAppView = function McpAppView({
       });
     };
 
-    appBridge.onreadresource = (params) => mcpProxy("resources/read", params);
-    appBridge.onlistresources = (params) => mcpProxy("resources/list", params);
-    appBridge.onlistresourcetemplates = (params) =>
-      mcpProxy("resources/templates/list", params);
-    appBridge.onlistprompts = (params) => mcpProxy("prompts/list", params);
+    // Scope resource/prompt handlers to the owning server to prevent a compromised
+    // MCP App from accessing resources on other servers attached to the same agent.
+    appBridge.onreadresource = async (params) => {
+      const uri = (params as { uri?: string }).uri;
+      if (typeof uri === "string" && !uri.includes(serverPrefix)) {
+        throw new Error("Resource not accessible from this MCP App");
+      }
+      return mcpProxy("resources/read", params);
+    };
+    appBridge.onlistresources = async () => {
+      const result = await mcpProxy("resources/list", {});
+      if (result?.resources) {
+        result.resources = (result.resources as { uri?: string }[]).filter(
+          (r) => typeof r.uri === "string" && r.uri.includes(serverPrefix),
+        );
+      }
+      return result;
+    };
+    appBridge.onlistresourcetemplates = async () => {
+      const result = await mcpProxy("resources/templates/list", {});
+      if (result?.resourceTemplates) {
+        result.resourceTemplates = (
+          result.resourceTemplates as { uriTemplate?: string }[]
+        ).filter(
+          (r) =>
+            typeof r.uriTemplate === "string" &&
+            r.uriTemplate.includes(serverPrefix),
+        );
+      }
+      return result;
+    };
+    appBridge.onlistprompts = async () => {
+      const result = await mcpProxy("prompts/list", {});
+      if (result?.prompts) {
+        result.prompts = (result.prompts as { name?: string }[]).filter(
+          (p) => typeof p.name === "string" && p.name.includes(serverPrefix),
+        );
+      }
+      return result;
+    };
 
     appBridge.onloggingmessage = (params) => {
       // biome-ignore lint/suspicious/noConsole: intentional — surfaces MCP App logs from sandboxed iframe
