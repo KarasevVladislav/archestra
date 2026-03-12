@@ -476,9 +476,9 @@ const startMetricsServer = async () => {
  * Blocks dangerous CSP sources like *, data:, blob:, https: that a denylist would miss.
  */
 // Matches bare domains (esm.sh), wildcard subdomains (*.esm.sh),
-// and scheme-prefixed domains (https://esm.sh, https://*.esm.sh).
+// scheme-prefixed domains (https://esm.sh, wss://esm.sh), and optional port (:8443).
 const VALID_CSP_DOMAIN =
-  /^(https?:\/\/)?(\*\.)?[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z]{2,})+$/;
+  /^(wss?:\/\/|https?:\/\/)?(\*\.)?[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z]{2,})+(:\d{1,5})?$/;
 
 export function sanitizeCspDomains(domains?: string[]): string[] {
   if (!domains) return [];

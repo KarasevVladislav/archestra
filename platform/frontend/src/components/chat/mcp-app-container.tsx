@@ -511,11 +511,14 @@ const McpAppView = function McpAppView({
   const latestBridgeRef = useRef<AppBridge | null>(null);
   // Monotonic counter for JSON-RPC IDs to avoid collisions from Date.now() in rapid calls.
   const rpcIdRef = useRef(0);
+  // Shared cancel ref so the prop-update useEffect can cancel an in-flight fallback fetch.
+  const fetchCancelledRef = useRef(false);
 
   // Create bridge + fetch HTML (once per agentId/resourceUri — callbacks via refs)
   // biome-ignore lint/correctness/useExhaustiveDependencies: callbacks accessed via stable refs
   useEffect(() => {
     let cancelled = false;
+    fetchCancelledRef.current = false;
 
     const appBridge = new AppBridge(
       null,
@@ -598,9 +601,18 @@ const McpAppView = function McpAppView({
 
     // Scope resource/prompt handlers to the owning server to prevent a compromised
     // MCP App from accessing resources on other servers attached to the same agent.
+    // Match the server prefix as a complete segment to prevent a substring
+    // bypass (e.g. "evil-stats" matching "stats").
+    const prefixPattern = `${serverPrefix}://`;
+    const prefixSeparator = `${serverPrefix}__`;
+
     appBridge.onreadresource = async (params) => {
       const uri = (params as { uri?: string }).uri;
-      if (typeof uri === "string" && !uri.includes(serverPrefix)) {
+      if (
+        typeof uri === "string" &&
+        !uri.startsWith(prefixPattern) &&
+        !uri.includes(`/${serverPrefix}/`)
+      ) {
         throw new Error("Resource not accessible from this MCP App");
       }
       return mcpProxy("resources/read", params);
@@ -609,7 +621,10 @@ const McpAppView = function McpAppView({
       const result = await mcpProxy("resources/list", {});
       if (result?.resources) {
         result.resources = (result.resources as { uri?: string }[]).filter(
-          (r) => typeof r.uri === "string" && r.uri.includes(serverPrefix),
+          (r) =>
+            typeof r.uri === "string" &&
+            (r.uri.startsWith(prefixPattern) ||
+              r.uri.includes(`/${serverPrefix}/`)),
         );
       }
       return result;
@@ -622,7 +637,8 @@ const McpAppView = function McpAppView({
         ).filter(
           (r) =>
             typeof r.uriTemplate === "string" &&
-            r.uriTemplate.includes(serverPrefix),
+            (r.uriTemplate.startsWith(prefixPattern) ||
+              r.uriTemplate.includes(`/${serverPrefix}/`)),
         );
       }
       return result;
@@ -631,7 +647,9 @@ const McpAppView = function McpAppView({
       const result = await mcpProxy("prompts/list", {});
       if (result?.prompts) {
         result.prompts = (result.prompts as { name?: string }[]).filter(
-          (p) => typeof p.name === "string" && p.name.includes(serverPrefix),
+          (p) =>
+            typeof p.name === "string" &&
+            (p.name === serverPrefix || p.name.startsWith(prefixSeparator)),
         );
       }
       return result;
@@ -644,11 +662,14 @@ const McpAppView = function McpAppView({
 
     // ui/message — View injects a user message into the conversation.
     // Text blocks are concatenated; non-text blocks are ignored.
+    // Cap length to prevent a compromised MCP App from injecting arbitrarily long text.
+    const MAX_MESSAGE_LENGTH = 10_000;
     appBridge.onmessage = async (params) => {
       const text = (params.content as Array<{ type: string; text?: string }>)
         .filter((b) => b.type === "text" && b.text)
         .map((b) => b.text as string)
-        .join("\n");
+        .join("\n")
+        .slice(0, MAX_MESSAGE_LENGTH);
       if (text) onSendMessageRef.current?.(text);
       return {};
     };
@@ -701,11 +722,11 @@ const McpAppView = function McpAppView({
         const csp = content._meta?.ui?.csp;
         const permissions = content._meta?.ui?.permissions;
 
-        if (!cancelled) {
+        if (!cancelled && !fetchCancelledRef.current) {
           setAppResource({ html, csp, permissions });
         }
       } catch (err) {
-        if (!cancelled) {
+        if (!cancelled && !fetchCancelledRef.current) {
           const error = err instanceof Error ? err : new Error(String(err));
           setLoadError(error.message);
           onErrorRef.current?.(error);
@@ -715,6 +736,7 @@ const McpAppView = function McpAppView({
 
     return () => {
       cancelled = true;
+      fetchCancelledRef.current = true;
       appBridge.teardownResource({}).catch(() => {});
     };
   }, [agentId, toolResourceUri]);
@@ -722,8 +744,10 @@ const McpAppView = function McpAppView({
   // If preloadedResource arrives as a prop update after initial mount (race
   // condition: tool part rendered before the SSE event was processed), apply it.
   // Only set if no resource is loaded yet to avoid overwriting a fetch result.
+  // Cancel any in-flight fallback fetch to prevent a double-render.
   useEffect(() => {
     if (preloadedResource && !appResource && !loadError) {
+      fetchCancelledRef.current = true;
       setAppResource(preloadedResource);
     }
   }, [preloadedResource, appResource, loadError]);

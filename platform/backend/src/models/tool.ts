@@ -548,11 +548,11 @@ class ToolModel {
       if (existingTool) {
         const metaChanged =
           JSON.stringify(existingTool.meta) !== JSON.stringify(tool.meta);
-        if (metaChanged && tool.meta) {
+        if (metaChanged) {
           metaUpdatePromises.push(
             db
               .update(schema.toolsTable)
-              .set({ meta: tool.meta, updatedAt: new Date() })
+              .set({ meta: tool.meta ?? null, updatedAt: new Date() })
               .where(eq(schema.toolsTable.id, existingTool.id))
               .returning()
               .then(([updated]) => updated ?? existingTool),

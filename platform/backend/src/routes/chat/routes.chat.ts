@@ -458,7 +458,7 @@ const chatRoutes: FastifyPluginAsyncZod = async (fastify) => {
                 //
                 // For successful requests, the first chunk arrives quickly
                 // and we proceed to merge the full stream to the client.
-                                let result = streamText(streamTextConfig);
+                let result = streamText(streamTextConfig);
 
                 // Try reading the first text chunk to detect immediate provider errors.
                 // Context-length errors fire before any tokens, so this catches them

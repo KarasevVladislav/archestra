@@ -247,7 +247,9 @@ class McpClient {
     if ("error" in validationResult) {
       return validationResult.error;
     }
-    const { tool, catalogItem } = validationResult;
+    const { tool, catalogItem, resolvedToolCall } = validationResult;
+    // Use the resolved name (may have been prefixed by suffix fallback lookup)
+    toolCall = resolvedToolCall;
 
     const targetMcpServerIdResult =
       await this.determineTargetMcpServerIdForCatalogItem({
@@ -709,7 +711,11 @@ class McpClient {
     toolCall: CommonToolCall,
     agentId: string,
   ): Promise<
-    | { tool: McpToolAssignment; catalogItem: InternalMcpCatalog }
+    | {
+        tool: McpToolAssignment;
+        catalogItem: InternalMcpCatalog;
+        resolvedToolCall: CommonToolCall;
+      }
     | { error: CommonToolResult }
   > {
     // Get MCP tool from agent-assigned tools
@@ -728,8 +734,8 @@ class McpClient {
         agentId,
       );
       if (mcpTools.length > 0) {
-        // Rewrite the tool call name so downstream execution uses the full prefixed name
-        toolCall.name = mcpTools[0].toolName;
+        // Use the full prefixed name for downstream execution but don't mutate the caller's object.
+        toolCall = { ...toolCall, name: mcpTools[0].toolName };
       }
     }
 
@@ -770,7 +776,7 @@ class McpClient {
       };
     }
 
-    return { tool, catalogItem };
+    return { tool, catalogItem, resolvedToolCall: toolCall };
   }
 
   // Gets secrets of a given MCP server, with short-lived caching to prevent
@@ -1976,7 +1982,7 @@ class McpClient {
       undefined,
       tokenAuth,
     );
-    const connectionKey = `${catalogItem.id}:${server.id}`;
+    const connectionKey = `${catalogItem.id}:${server.id}:${agentId}`;
     const client = await this.getOrCreateClient(connectionKey, transport);
 
     const result = await client.readResource({ uri });

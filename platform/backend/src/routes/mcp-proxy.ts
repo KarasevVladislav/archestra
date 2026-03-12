@@ -52,7 +52,9 @@ export const mcpProxyRoutes: FastifyPluginAsyncZod = async (fastify) => {
 
       // Verify user has access to the requested agent, using a short-lived
       // cache to avoid repeated DB round-trips within the same MCP App session.
-      let agent = agentAccessCache.get(`${agentId}:${userId}`);
+      // Include organizationId in the key so cached entries cannot leak across orgs.
+      const agentCacheKey = `${agentId}:${userId}:${organizationId}`;
+      let agent = agentAccessCache.get(agentCacheKey);
       if (!agent) {
         const isAgentAdmin = await hasAnyAgentTypeAdminPermission({
           userId,
@@ -61,8 +63,8 @@ export const mcpProxyRoutes: FastifyPluginAsyncZod = async (fastify) => {
         agent =
           (await AgentModel.findById(agentId, userId, isAgentAdmin)) ??
           undefined;
-        if (agent) {
-          agentAccessCache.set(`${agentId}:${userId}`, agent);
+        if (agent && agent.organizationId === organizationId) {
+          agentAccessCache.set(agentCacheKey, agent);
         }
       }
       if (!agent || agent.organizationId !== organizationId) {
@@ -146,6 +148,7 @@ export const mcpProxyRoutes: FastifyPluginAsyncZod = async (fastify) => {
 
       let hijacked = false;
       let server: McpServer | undefined;
+      let serverHealthy = false;
       try {
         const cachedServer = mcpServerCache.acquire(agentId, userId);
         if (cachedServer) {
@@ -173,6 +176,7 @@ export const mcpProxyRoutes: FastifyPluginAsyncZod = async (fastify) => {
           }));
           await server.connect(transport);
         }
+        serverHealthy = true;
 
         // Hijack reply to let SDK handle raw response
         reply.hijack();
@@ -209,7 +213,8 @@ export const mcpProxyRoutes: FastifyPluginAsyncZod = async (fastify) => {
           );
         }
       } finally {
-        if (server) mcpServerCache.release(agentId, userId, server);
+        if (server)
+          mcpServerCache.release(agentId, userId, server, serverHealthy);
       }
     },
   );
@@ -250,15 +255,24 @@ class McpServerCache {
     return entry.server;
   }
 
-  /** Release a server back into the cache for future reuse. */
-  release(agentId: string, userId: string, server: McpServer): void {
+  /** Release a server back into the cache for future reuse. Only caches healthy servers. */
+  release(
+    agentId: string,
+    userId: string,
+    server: McpServer,
+    healthy: boolean,
+  ): void {
     const key = `${agentId}:${userId}`;
     const entry = this.lru.get(key);
     if (entry && entry.server === server) {
-      entry.inUse = false;
-    } else if (!entry) {
-      // Only cache on first use; discard stale instances when the slot was
-      // replaced by a fresh connection to avoid caching a broken server.
+      if (healthy) {
+        entry.inUse = false;
+      } else {
+        // Remove broken servers so they aren't reused
+        this.lru.delete(key);
+      }
+    } else if (!entry && healthy) {
+      // Only cache on first use when healthy; discard stale/broken instances.
       this.lru.set(key, { server, inUse: false });
     }
   }
