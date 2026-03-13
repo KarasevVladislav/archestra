@@ -594,10 +594,15 @@ const startSandboxServer = async () => {
       // frame-ancestors restricts which origins can embed this sandbox iframe,
       // complementing the JS-side referrer check which is unreliable under
       // Referrer-Policy: no-referrer or nested iframe scenarios.
+      // When allowedOrigins is configured, restrict framing to those origins.
+      // When empty (no ARCHESTRA_FRONTEND_URL set), allow any ancestor — matching
+      // the permissive CORS behaviour used for dev/open deployments. Using 'self'
+      // here would block the frontend (port 3000) from framing the sandbox (port 3002)
+      // since they are different origins.
       const frameAncestors =
         config.mcpSandbox.allowedOrigins.length > 0
           ? config.mcpSandbox.allowedOrigins.join(" ")
-          : "'self'";
+          : "*";
       const cspHeader = `${buildCspHeader(cspConfig)}; frame-ancestors ${frameAncestors}`;
       void reply.header("Content-Security-Policy", cspHeader);
 

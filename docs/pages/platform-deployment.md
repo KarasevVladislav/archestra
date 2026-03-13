@@ -487,8 +487,8 @@ archestra:
 After installation, access the platform using port forwarding:
 
 ```bash
-# Forward the API (port 9000) and the Admin UI (port 3000)
-kubectl --namespace archestra port-forward svc/archestra-platform 9000:9000 3000:3000
+# Forward the API (port 9000), Admin UI (port 3000), and MCP Apps sandbox (port 3002)
+kubectl --namespace archestra port-forward svc/archestra-platform 9000:9000 3000:3000 3002:3002
 ```
 
 Then visit:

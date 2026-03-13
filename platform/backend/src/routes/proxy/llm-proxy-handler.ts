@@ -675,25 +675,32 @@ async function handleStreaming<
 
           const result = streamAdapter.processChunk(chunk);
 
-          // Stream all data immediately — both text deltas and tool call
-          // chunks. Tool calls were previously buffered until policy
-          // evaluation completed, but this caused multi-second latency
-          // spikes for large tool-call payloads. Policies are still
-          // evaluated after the stream; if a tool call is blocked, a
-          // refusal message is appended to the stream.
+          // Stream text deltas immediately. For tool call chunks, the
+          // behaviour depends on the global tool policy:
+          //  - "permissive" (default): stream tool call chunks immediately
+          //    for low latency (important for MCP Apps streaming UX).
+          //  - any other policy: buffer tool call chunks until policy
+          //    evaluation completes so blocked calls are never exposed.
           if (result.sseData) {
             ensureStreamHeaders();
             reply.raw.write(result.sseData);
           } else if (result.isToolCallChunk) {
-            // Tool call chunks: use adapter's own SSE formatting (handles
-            // provider-specific formats like Anthropic's event: prefix).
-            // Write any new events since the last flush.
-            const allEvents = streamAdapter.getRawToolCallEvents();
-            ensureStreamHeaders();
-            for (let i = toolCallEventsFlushed; i < allEvents.length; i++) {
-              reply.raw.write(allEvents[i]);
+            if (globalToolPolicy === "permissive") {
+              // Stream tool call events immediately for low latency.
+              const allEvents = streamAdapter.getRawToolCallEvents();
+              ensureStreamHeaders();
+              for (
+                let i = toolCallEventsFlushed;
+                i < allEvents.length;
+                i++
+              ) {
+                reply.raw.write(allEvents[i]);
+              }
+              toolCallEventsFlushed = allEvents.length;
             }
-            toolCallEventsFlushed = allEvents.length;
+            // Non-permissive: events accumulate in
+            // streamAdapter.state.rawToolCallEvents and are flushed
+            // (or discarded) after policy evaluation below.
           }
 
           if (result.isFinal) {
@@ -785,10 +792,13 @@ async function handleStreaming<
       const { contentMessage, reason, allToolCallNames } =
         toolInvocationRefusal;
 
-      // Tool call chunks were already streamed inline for low latency.
-      // Append a refusal text event so clients know not to execute them.
+      // When permissive, tool call chunks were already streamed — append
+      // refusal so clients know not to execute them. When non-permissive,
+      // tool call chunks were buffered and discarded — send only the refusal
+      // so blocked tool call data is never exposed.
       ensureStreamHeaders();
-      const refusalEvents = streamAdapter.formatCompleteTextSSE(contentMessage);
+      const refusalEvents =
+        streamAdapter.formatCompleteTextSSE(contentMessage);
       for (const event of refusalEvents) {
         reply.raw.write(event);
       }
@@ -805,8 +815,18 @@ async function handleStreaming<
         source,
         externalAgentId,
       });
+    } else if (
+      globalToolPolicy !== "permissive" &&
+      toolCalls.length > 0
+    ) {
+      // Non-permissive policy: tool call chunks were buffered during
+      // streaming. Policy allowed them, so flush now.
+      const allEvents = streamAdapter.getRawToolCallEvents();
+      ensureStreamHeaders();
+      for (const event of allEvents) {
+        reply.raw.write(event);
+      }
     }
-    // Tool call chunks were already streamed inline — no flush needed.
 
     // Stream end events
     ensureStreamHeaders();
