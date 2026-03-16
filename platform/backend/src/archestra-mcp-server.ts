@@ -9,10 +9,16 @@ import {
   TOOL_TODO_WRITE_FULL_NAME,
 } from "@shared";
 import { executeA2AMessage } from "@/agents/a2a-executor";
+import { hasAnyAgentTypeAdminPermission } from "@/auth/agent-type-permissions";
 import { userHasPermission } from "@/auth/utils";
+import { selectMCPGatewayToken } from "@/clients/chat-mcp-client";
+import {
+  detectProviderFromModel,
+  resolveProviderApiKey,
+} from "@/clients/llm-client";
 import type { TokenAuthContext } from "@/clients/mcp-client";
-import { getKnowledgeGraphProvider } from "@/knowledge-graph";
 import config from "@/config";
+import { getKnowledgeGraphProvider } from "@/knowledge-graph";
 import logger from "@/logging";
 import {
   AgentModel,
@@ -72,6 +78,7 @@ const TOOL_GET_AGENT_NAME = "get_agent";
 const TOOL_GET_LLM_PROXY_NAME = "get_llm_proxy";
 const TOOL_GET_MCP_GATEWAY_NAME = "get_mcp_gateway";
 const TOOL_GET_MCP_GATEWAYS_NAME = "get_mcp_gateways";
+const TOOL_GET_WORKFLOW_INPUTS_NAME = "get_workflow_inputs";
 
 /**
  * Convert a name to a URL-safe slug for tool naming
@@ -114,6 +121,7 @@ const TOOL_GET_AGENT_FULL_NAME = `${ARCHESTRA_MCP_SERVER_NAME}${MCP_SERVER_TOOL_
 const TOOL_GET_LLM_PROXY_FULL_NAME = `${ARCHESTRA_MCP_SERVER_NAME}${MCP_SERVER_TOOL_NAME_SEPARATOR}${TOOL_GET_LLM_PROXY_NAME}`;
 const TOOL_GET_MCP_GATEWAY_FULL_NAME = `${ARCHESTRA_MCP_SERVER_NAME}${MCP_SERVER_TOOL_NAME_SEPARATOR}${TOOL_GET_MCP_GATEWAY_NAME}`;
 const TOOL_GET_MCP_GATEWAYS_FULL_NAME = `${ARCHESTRA_MCP_SERVER_NAME}${MCP_SERVER_TOOL_NAME_SEPARATOR}${TOOL_GET_MCP_GATEWAYS_NAME}`;
+const TOOL_GET_WORKFLOW_INPUTS_FULL_NAME = `${ARCHESTRA_MCP_SERVER_NAME}${MCP_SERVER_TOOL_NAME_SEPARATOR}${TOOL_GET_WORKFLOW_INPUTS_NAME}`;
 
 /**
  * Context for the Archestra MCP server
@@ -1748,10 +1756,7 @@ export async function executeArchestraTool(
   }
 
   if (toolName === TOOL_GET_MCP_GATEWAYS_FULL_NAME) {
-    logger.info(
-      { agentId: contextAgent.id },
-      "get_mcp_gateways tool called",
-    );
+    logger.info({ agentId: contextAgent.id }, "get_mcp_gateways tool called");
 
     try {
       const allAgents = await AgentModel.findAll(undefined, undefined, {
@@ -1785,6 +1790,159 @@ export async function executeArchestraTool(
           {
             type: "text",
             text: `Error getting MCP gateways: ${
+              error instanceof Error ? error.message : "Unknown error"
+            }`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+
+  if (toolName === TOOL_GET_WORKFLOW_INPUTS_FULL_NAME) {
+    logger.info(
+      { agentId: contextAgent.id, gatewayId: args?.gatewayId },
+      "get_workflow_inputs tool called",
+    );
+
+    const gatewayId = args?.gatewayId as string;
+    if (!gatewayId) {
+      return {
+        content: [{ type: "text", text: "Error: gatewayId is required." }],
+        isError: true,
+      };
+    }
+
+    if (!context.conversationId) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: "Error: This tool can only be used from chat.",
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    if (!organizationId) {
+      return {
+        content: [
+          { type: "text", text: "Error: Organization context not available." },
+        ],
+        isError: true,
+      };
+    }
+
+    try {
+      // 1. Resolve MCP gateway URL
+      const gateway = await AgentModel.findById(gatewayId);
+      if (!gateway || gateway.agentType !== "mcp_gateway") {
+        return {
+          content: [{ type: "text", text: "Error: MCP Gateway not found." }],
+          isError: true,
+        };
+      }
+      const mcpEndpointUrl = `${config.frontendBaseUrl.replace(/\/$/, "")}/v1/mcp/${gateway.id}`;
+
+      // 2. Resolve MCP gateway bearer token
+      const userId = context.userId || tokenAuth?.userId;
+      let mcpBearerToken: string | null = null;
+      if (userId) {
+        const userIsAdmin = await hasAnyAgentTypeAdminPermission({
+          userId,
+          organizationId,
+        });
+        const tokenResult = await selectMCPGatewayToken(
+          gatewayId,
+          userId,
+          organizationId,
+          userIsAdmin,
+        );
+        mcpBearerToken = tokenResult?.tokenValue ?? null;
+      }
+
+      // 3. Resolve LLM credentials from current conversation
+      const conversation = await ConversationModel.findById({
+        id: context.conversationId,
+        userId: userId ?? "",
+        organizationId,
+      });
+      let chatModelProvider: string | null = null;
+      let chatModelApiKey: string | null = null;
+      let chatModelName: string | null = null;
+      const notes: string[] = [];
+
+      if (conversation?.selectedModel) {
+        chatModelName = conversation.selectedModel;
+        const provider =
+          conversation.selectedProvider ||
+          detectProviderFromModel(conversation.selectedModel);
+
+        // Only these providers are supported for n8n chat model nodes
+        if (
+          provider === "anthropic" ||
+          provider === "openai" ||
+          provider === "gemini"
+        ) {
+          chatModelProvider = provider;
+          const apiKeyResult = await resolveProviderApiKey({
+            organizationId,
+            userId,
+            provider,
+            conversationId: context.conversationId,
+          });
+          chatModelApiKey = apiKeyResult.apiKey ?? null;
+          if (!chatModelApiKey) {
+            notes.push(
+              `No API key found for ${provider}. Chat model credentials will not be configured.`,
+            );
+          }
+        } else {
+          notes.push(
+            `Provider "${provider}" is not supported for n8n chat model nodes (only anthropic, openai, and gemini). Chat model will not be configured.`,
+          );
+        }
+      } else {
+        notes.push(
+          "No model selected in conversation. Chat model will not be configured.",
+        );
+      }
+
+      if (!mcpBearerToken) {
+        notes.push(
+          "No MCP gateway bearer token available. MCP Client auth will not be configured.",
+        );
+      }
+
+      const result: Record<string, unknown> = {
+        mcpEndpointUrl,
+        mcpBearerToken,
+        chatModelProvider,
+        chatModelApiKey,
+        chatModelName,
+      };
+
+      if (notes.length > 0) {
+        result.notes = notes;
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(result, null, 2),
+          },
+        ],
+        isError: false,
+      };
+    } catch (error) {
+      logger.error({ err: error }, "Error getting workflow inputs");
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error getting workflow inputs: ${
               error instanceof Error ? error.message : "Unknown error"
             }`,
           },
@@ -2899,6 +3057,25 @@ export function getArchestraMcpTools(): Tool[] {
         type: "object",
         properties: {},
         required: [],
+      },
+      annotations: {},
+      _meta: {},
+    },
+    {
+      name: TOOL_GET_WORKFLOW_INPUTS_FULL_NAME,
+      title: "Get Workflow Inputs",
+      description:
+        "Returns all data needed to create a fully-configured n8n workflow connected to an Archestra MCP Gateway. Pass the returned values (mcpEndpointUrl, mcpBearerToken, chatModelProvider, chatModelApiKey, chatModelName) to the create_mcp_agent_workflow tool. Call this BEFORE creating an n8n workflow to get credentials pre-configured.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          gatewayId: {
+            type: "string",
+            description:
+              "The ID of the MCP gateway to connect the workflow to. Use get_mcp_gateways to find available gateways.",
+          },
+        },
+        required: ["gatewayId"],
       },
       annotations: {},
       _meta: {},
