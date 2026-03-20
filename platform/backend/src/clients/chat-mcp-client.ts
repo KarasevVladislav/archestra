@@ -120,6 +120,18 @@ const toolCache = new LRUCacheManager<Record<string, Tool>>({
 });
 
 /**
+ * UI resource cache TTL — 60 seconds.
+ * UI resources (MCP App HTML) rarely change during a conversation, so a
+ * generous TTL avoids repeated round-trips through the MCP gateway.
+ */
+const UI_RESOURCE_CACHE_TTL_MS = 60 * TimeInMs.Second;
+
+const uiResourceCache = new LRUCacheManager<ToolUiResourceData | null>({
+  maxSize: 500,
+  defaultTtl: UI_RESOURCE_CACHE_TTL_MS,
+});
+
+/**
  * Generate cache key from agentId, userId, and optional conversationId.
  * When conversationId is provided, each conversation gets its own MCP client
  * and therefore its own browser instance for proper isolation.
@@ -1175,6 +1187,13 @@ export async function fetchToolUiResource({
   toolName: string;
   uri: string;
 }): Promise<ToolUiResourceData | null> {
+  const cacheKey = `${agentId}:${userId}:${uri}`;
+  const cached = uiResourceCache.get(cacheKey);
+  if (cached !== undefined) {
+    logger.debug({ uri, agentId, toolName }, "UI resource cache hit");
+    return cached;
+  }
+
   const client = await getChatMcpClient(
     agentId,
     userId,
@@ -1202,7 +1221,13 @@ export async function fetchToolUiResource({
     };
     const uiMeta = (content as { _meta?: { ui?: ContentUiMeta } })._meta?.ui;
 
-    return { html, csp: uiMeta?.csp, permissions: uiMeta?.permissions };
+    const result: ToolUiResourceData = {
+      html,
+      csp: uiMeta?.csp,
+      permissions: uiMeta?.permissions,
+    };
+    uiResourceCache.set(cacheKey, result);
+    return result;
   } catch (error) {
     logger.debug(
       { error, toolName, uri, agentId },

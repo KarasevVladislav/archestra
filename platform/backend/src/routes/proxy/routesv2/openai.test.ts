@@ -275,123 +275,131 @@ describe("OpenAI V2 streaming mode", () => {
     expect(typeof interaction.baselineCost).toBe("string");
   });
 
-  test("streaming mode interrupted still records interaction", {
-    timeout: 10000,
-  }, async ({ makeAgent }) => {
-    const app = Fastify().withTypeProvider<ZodTypeProvider>();
-    app.setValidatorCompiler(validatorCompiler);
-    app.setSerializerCompiler(serializerCompiler);
+  test(
+    "streaming mode interrupted still records interaction",
+    {
+      timeout: 10000,
+    },
+    async ({ makeAgent }) => {
+      const app = Fastify().withTypeProvider<ZodTypeProvider>();
+      app.setValidatorCompiler(validatorCompiler);
+      app.setSerializerCompiler(serializerCompiler);
 
-    // Configure stub to interrupt at chunk 4 (after usage chunk but before stream completes)
-    openAiStubOptions.interruptAtChunk = 4;
+      // Configure stub to interrupt at chunk 4 (after usage chunk but before stream completes)
+      openAiStubOptions.interruptAtChunk = 4;
 
-    await app.register(openAiProxyRoutesV2);
+      await app.register(openAiProxyRoutesV2);
 
-    await ModelModel.upsert({
-      externalId: "openai/gpt-4o",
-      provider: "openai",
-      modelId: "gpt-4o",
-      inputModalities: null,
-      outputModalities: null,
-      customPricePerMillionInput: "2.50",
-      customPricePerMillionOutput: "10.00",
-      lastSyncedAt: new Date(),
-    });
+      await ModelModel.upsert({
+        externalId: "openai/gpt-4o",
+        provider: "openai",
+        modelId: "gpt-4o",
+        inputModalities: null,
+        outputModalities: null,
+        customPricePerMillionInput: "2.50",
+        customPricePerMillionOutput: "10.00",
+        lastSyncedAt: new Date(),
+      });
 
-    const agent = await makeAgent({
-      name: "Test Interrupted Streaming Agent",
-    });
+      const agent = await makeAgent({
+        name: "Test Interrupted Streaming Agent",
+      });
 
-    const { InteractionModel } = await import("@/models");
+      const { InteractionModel } = await import("@/models");
 
-    const initialInteractions =
-      await InteractionModel.getAllInteractionsForProfile(agent.id);
-    const initialCount = initialInteractions.length;
+      const initialInteractions =
+        await InteractionModel.getAllInteractionsForProfile(agent.id);
+      const initialCount = initialInteractions.length;
 
-    const response = await app.inject({
-      method: "POST",
-      url: `/v1/openai/${agent.id}/chat/completions`,
-      headers: {
-        "content-type": "application/json",
-        authorization: "Bearer test-key",
-        "user-agent": "test-client",
-      },
-      payload: {
-        model: "gpt-4o",
-        messages: [{ role: "user", content: "Hello!" }],
-        stream: true,
-      },
-    });
+      const response = await app.inject({
+        method: "POST",
+        url: `/v1/openai/${agent.id}/chat/completions`,
+        headers: {
+          "content-type": "application/json",
+          authorization: "Bearer test-key",
+          "user-agent": "test-client",
+        },
+        payload: {
+          model: "gpt-4o",
+          messages: [{ role: "user", content: "Hello!" }],
+          stream: true,
+        },
+      });
 
-    // Stream ends early but request should complete successfully
-    expect(response.statusCode).toBe(200);
+      // Stream ends early but request should complete successfully
+      expect(response.statusCode).toBe(200);
 
-    await new Promise((resolve) => setTimeout(resolve, 200));
+      await new Promise((resolve) => setTimeout(resolve, 200));
 
-    // Verify interaction was still recorded despite interruption
-    const interactions = await InteractionModel.getAllInteractionsForProfile(
-      agent.id,
-    );
-    expect(interactions.length).toBe(initialCount + 1);
+      // Verify interaction was still recorded despite interruption
+      const interactions = await InteractionModel.getAllInteractionsForProfile(
+        agent.id,
+      );
+      expect(interactions.length).toBe(initialCount + 1);
 
-    const interaction = interactions[interactions.length - 1];
+      const interaction = interactions[interactions.length - 1];
 
-    expect(interaction.type).toBe("openai:chatCompletions");
-    expect(interaction.model).toBe("gpt-4o");
-    expect(interaction.inputTokens).toBe(12);
-    expect(interaction.outputTokens).toBe(10);
-    expect(interaction.cost).toBeTruthy();
-    expect(interaction.baselineCost).toBeTruthy();
-  });
+      expect(interaction.type).toBe("openai:chatCompletions");
+      expect(interaction.model).toBe("gpt-4o");
+      expect(interaction.inputTokens).toBe(12);
+      expect(interaction.outputTokens).toBe(10);
+      expect(interaction.cost).toBeTruthy();
+      expect(interaction.baselineCost).toBeTruthy();
+    },
+  );
 
-  test("streaming mode interrupted before usage handles gracefully", {
-    timeout: 10000,
-  }, async ({ makeAgent }) => {
-    const app = Fastify().withTypeProvider<ZodTypeProvider>();
-    app.setValidatorCompiler(validatorCompiler);
-    app.setSerializerCompiler(serializerCompiler);
+  test(
+    "streaming mode interrupted before usage handles gracefully",
+    {
+      timeout: 10000,
+    },
+    async ({ makeAgent }) => {
+      const app = Fastify().withTypeProvider<ZodTypeProvider>();
+      app.setValidatorCompiler(validatorCompiler);
+      app.setSerializerCompiler(serializerCompiler);
 
-    // Configure stub to interrupt at chunk 2 (before usage chunk)
-    openAiStubOptions.interruptAtChunk = 2;
+      // Configure stub to interrupt at chunk 2 (before usage chunk)
+      openAiStubOptions.interruptAtChunk = 2;
 
-    await app.register(openAiProxyRoutesV2);
+      await app.register(openAiProxyRoutesV2);
 
-    await ModelModel.upsert({
-      externalId: "openai/gpt-4o",
-      provider: "openai",
-      modelId: "gpt-4o",
-      inputModalities: null,
-      outputModalities: null,
-      customPricePerMillionInput: "2.50",
-      customPricePerMillionOutput: "10.00",
-      lastSyncedAt: new Date(),
-    });
+      await ModelModel.upsert({
+        externalId: "openai/gpt-4o",
+        provider: "openai",
+        modelId: "gpt-4o",
+        inputModalities: null,
+        outputModalities: null,
+        customPricePerMillionInput: "2.50",
+        customPricePerMillionOutput: "10.00",
+        lastSyncedAt: new Date(),
+      });
 
-    const agent = await makeAgent({
-      name: "Test Interrupted Before Usage Agent",
-    });
+      const agent = await makeAgent({
+        name: "Test Interrupted Before Usage Agent",
+      });
 
-    const response = await app.inject({
-      method: "POST",
-      url: `/v1/openai/${agent.id}/chat/completions`,
-      headers: {
-        "content-type": "application/json",
-        authorization: "Bearer test-key",
-        "user-agent": "test-client",
-      },
-      payload: {
-        model: "gpt-4o",
-        messages: [{ role: "user", content: "Hello!" }],
-        stream: true,
-      },
-    });
+      const response = await app.inject({
+        method: "POST",
+        url: `/v1/openai/${agent.id}/chat/completions`,
+        headers: {
+          "content-type": "application/json",
+          authorization: "Bearer test-key",
+          "user-agent": "test-client",
+        },
+        payload: {
+          model: "gpt-4o",
+          messages: [{ role: "user", content: "Hello!" }],
+          stream: true,
+        },
+      });
 
-    // Request should complete without error even when stream is interrupted
-    expect(response.statusCode).toBe(200);
+      // Request should complete without error even when stream is interrupted
+      expect(response.statusCode).toBe(200);
 
-    // Response should have partial SSE data
-    expect(response.body).toContain("data: ");
-  });
+      // Response should have partial SSE data
+      expect(response.body).toContain("data: ");
+    },
+  );
 });
 
 describe("OpenAI V2 proxy routing", () => {

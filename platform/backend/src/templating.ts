@@ -1,4 +1,3 @@
-import type { ContentBlock } from "@modelcontextprotocol/sdk/types.js";
 import Handlebars from "handlebars";
 import logger from "@/logging";
 

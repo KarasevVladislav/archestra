@@ -26,6 +26,7 @@ import {
   fetchToolUiResource,
   getChatMcpTools,
   getChatMcpToolUiResourceUris,
+  type ToolUiResourceData,
 } from "@/clients/chat-mcp-client";
 import {
   createDirectLLMModel,
@@ -225,20 +226,20 @@ const chatRoutes: FastifyPluginAsyncZod = async (fastify) => {
         promptContext,
       );
 
-      let toolResultInstructions: string
+      let toolResultInstructions: string;
       // Add MCP UI instruction when tools are available
       if (Object.keys(mcpTools).length > 0) {
         toolResultInstructions =
           "When a tool result includes a UI resource, it means an interactive UI was rendered for the user. Respond with at most one brief sentence. Never describe, list, or explain what the UI shows.";
-
       }
 
       const toolDenialInstruction =
         "When a tool execution is not approved by the user, do not retry it. Explain what happened and ask the user what they'd like to do instead.";
 
       systemPrompt =
-        [renderedPrompt, toolDenialInstruction, toolResultInstructions].filter(Boolean).join("\n\n") ||
-        undefined;
+        [renderedPrompt, toolDenialInstruction, toolResultInstructions]
+          .filter(Boolean)
+          .join("\n\n") || undefined;
 
       // Use stored provider if available, otherwise detect from model name for backward compatibility
       // At the moment of migration, all supported providers (anthropic, openai, gemini) serve different models,
@@ -429,6 +430,82 @@ const chatRoutes: FastifyPluginAsyncZod = async (fastify) => {
                 }
               },
               execute: async ({ writer }) => {
+                // Prefetch all UI resources eagerly before streaming starts
+                // so onChunk can write data-tool-ui-start synchronously.
+                // Even with LRU caching, .then() on a resolved promise runs
+                // as a microtask — the stream processes more chunks before
+                // the microtask fires, causing data-tool-ui-start to arrive
+                // after all tool deltas instead of right after tool-input-start.
+                const MAX_SSE_HTML_BYTES = 1024 * 1024;
+                const prefetchedUiResources = new Map<
+                  string,
+                  ToolUiResourceData
+                >();
+                if (
+                  conversation.agentId &&
+                  Object.keys(toolUiResourceUris).length > 0
+                ) {
+                  await Promise.all(
+                    Object.entries(toolUiResourceUris).map(
+                      async ([toolName, uri]) => {
+                        try {
+                          const resource = await fetchToolUiResource({
+                            agentId: conversation.agentId!,
+                            userId: user.id,
+                            organizationId,
+                            userIsAgentAdmin,
+                            conversationId: conversation.id,
+                            toolName,
+                            uri,
+                          });
+                          if (resource) {
+                            const html =
+                              resource.html &&
+                              Buffer.byteLength(resource.html) <=
+                                MAX_SSE_HTML_BYTES
+                                ? resource.html
+                                : undefined;
+                            prefetchedUiResources.set(toolName, {
+                              ...resource,
+                              html,
+                            });
+                          }
+                        } catch (err) {
+                          logger.debug(
+                            { err, toolName },
+                            "Failed to prefetch UI resource",
+                          );
+                        }
+                      },
+                    ),
+                  );
+                }
+
+                // Emit data-tool-ui-start synchronously in onChunk so it
+                // arrives right after tool-input-start, before any deltas.
+                streamTextConfig.onChunk = ({ chunk }) => {
+                  if (chunk.type === "tool-input-start" && chunk.toolName) {
+                    const prefetched = prefetchedUiResources.get(
+                      chunk.toolName,
+                    );
+                    if (prefetched) {
+                      writer.write({
+                        type: "data-tool-ui-start",
+                        data: {
+                          toolCallId: chunk.id,
+                          toolName: chunk.toolName,
+                          uiResourceUri:
+                            toolUiResourceUris[chunk.toolName],
+                          html: prefetched.html,
+                          csp: prefetched.csp,
+                          permissions: prefetched.permissions,
+                        },
+                      });
+                    }
+                  }
+                };
+
+
                 // ⚠️ TEMPORARY: Error injection for testing retries. Remove after testing.
                 const lastMsg = (
                   messages as { parts?: { type: string; text?: string }[] }[]
@@ -509,68 +586,6 @@ const chatRoutes: FastifyPluginAsyncZod = async (fastify) => {
                     }
                   }
                 }
-
-
-                // When the LLM invokes a tool that has a UI resource, fetch
-                // the HTML on demand and emit a data-tool-ui-start SSE event so
-                // the frontend can render the MCP App iframe immediately without
-                // a second HTTP request.
-                streamTextConfig.onChunk = ({ chunk }) => {
-                  if (chunk.type === "tool-input-start" && chunk.toolName) {
-                    if (!conversation.agentId) {
-                      throw new ApiError(
-                        500,
-                        "Conversation agent ID not found",
-                      );
-                    }
-                    const uiResourceUri = toolUiResourceUris[chunk.toolName];
-                    if (uiResourceUri) {
-                      const toolCallId = chunk.id;
-                      const toolName = chunk.toolName;
-                      fetchToolUiResource({
-                        agentId: conversation.agentId,
-                        userId: user.id,
-                        organizationId,
-                        userIsAgentAdmin,
-                        conversationId: conversation.id,
-                        toolName,
-                        uri: uiResourceUri,
-                      })
-                        .then((resource) => {
-                          // Cap HTML in SSE to 1 MB; larger payloads are
-                          // fetched on demand by the frontend via the MCP proxy.
-                          const MAX_SSE_HTML_BYTES = 1024 * 1024;
-                          const html =
-                            resource?.html &&
-                            Buffer.byteLength(resource.html) <=
-                            MAX_SSE_HTML_BYTES
-                              ? resource.html
-                              : undefined;
-                          try {
-                            writer.write({
-                              type: "data-tool-ui-start",
-                              data: {
-                                toolCallId,
-                                toolName,
-                                uiResourceUri,
-                                html,
-                                csp: resource?.csp,
-                                permissions: resource?.permissions,
-                              },
-                            });
-                          } catch {
-                            // Stream may have closed before the async fetch completed
-                          }
-                        })
-                        .catch((err) => {
-                          logger.debug(
-                            { err, toolName },
-                            "Failed to fetch UI resource for SSE",
-                          );
-                        });
-                    }
-                  }
-                };
 
                 writer.merge(
                   result.toUIMessageStream({
@@ -706,6 +721,7 @@ const chatRoutes: FastifyPluginAsyncZod = async (fastify) => {
                     } satisfies TokenUsage,
                   });
                 }
+
               },
             }),
           });

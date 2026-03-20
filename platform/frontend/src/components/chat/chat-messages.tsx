@@ -12,8 +12,8 @@ import type { ChatStatus, DynamicToolUIPart, ToolUIPart } from "ai";
 import { CheckCircleIcon, ClockIcon } from "lucide-react";
 import {
   Fragment,
-  useCallback,
   memo,
+  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -1308,12 +1308,12 @@ const MessageTool = memo(
                     label: "Decline",
                     variant: "outline",
                     onClick: () => {
-                      setUserDenied(true)
+                      setUserDenied(true);
                       onToolApprovalResponse({
                         id: (part as { approval: { id: string } }).approval.id,
                         approved: false,
                         reason: "User denied",
-                      })
+                      });
                     },
                   },
                 ]}
