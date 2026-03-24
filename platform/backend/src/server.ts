@@ -556,43 +556,38 @@ const registerSandboxRoute = (
     );
   }
 
-  fastify.get(
-    "/_sandbox/mcp-sandbox-proxy.html",
-    async (request, reply) => {
-      // When a sandbox domain is configured, validate the Host header matches
-      // *.{domain} to prevent the sandbox route from being abused on the main origin.
-      if (config.mcpSandbox.domain) {
-        const host = request.hostname;
-        if (!host.endsWith(`.${config.mcpSandbox.domain}`)) {
-          return reply.status(403).send("Invalid sandbox host");
-        }
+  fastify.get("/_sandbox/mcp-sandbox-proxy.html", async (request, reply) => {
+    // When a sandbox domain is configured, validate the Host header matches
+    // *.{domain} to prevent the sandbox route from being abused on the main origin.
+    if (config.mcpSandbox.domain) {
+      const host = request.hostname;
+      if (!host.endsWith(`.${config.mcpSandbox.domain}`)) {
+        return reply.status(403).send("Invalid sandbox host");
       }
+    }
 
-      // frame-ancestors restricts which origins can embed this sandbox iframe.
-      // This is the only CSP directive set via HTTP header — it cannot be set via meta tag.
-      // Guest content CSP is handled by the proxy HTML (meta tag injection from sandbox-resource-ready message).
-      const frameAncestorsList = [...config.mcpSandbox.allowedOrigins];
-      if (config.mcpSandbox.domain) {
-        frameAncestorsList.push(`*.${config.mcpSandbox.domain}`);
-      }
-      const frameAncestors =
-        frameAncestorsList.length > 0
-          ? frameAncestorsList.join(" ")
-          : "*";
-      void reply.header(
-        "Content-Security-Policy",
-        `frame-ancestors ${frameAncestors}`,
-      );
+    // frame-ancestors restricts which origins can embed this sandbox iframe.
+    // This is the only CSP directive set via HTTP header — it cannot be set via meta tag.
+    // Guest content CSP is handled by the proxy HTML (meta tag injection from sandbox-resource-ready message).
+    const frameAncestorsList = [...config.mcpSandbox.allowedOrigins];
+    if (config.mcpSandbox.domain) {
+      frameAncestorsList.push(`*.${config.mcpSandbox.domain}`);
+    }
+    const frameAncestors =
+      frameAncestorsList.length > 0 ? frameAncestorsList.join(" ") : "*";
+    void reply.header(
+      "Content-Security-Policy",
+      `frame-ancestors ${frameAncestors}`,
+    );
 
-      // Prevent caching to ensure fresh CSP on each load
-      void reply.header("Cache-Control", "no-cache, no-store, must-revalidate");
-      void reply.header("Pragma", "no-cache");
-      void reply.header("Expires", "0");
+    // Prevent caching to ensure fresh CSP on each load
+    void reply.header("Cache-Control", "no-cache, no-store, must-revalidate");
+    void reply.header("Pragma", "no-cache");
+    void reply.header("Expires", "0");
 
-      void reply.type("text/html");
-      return reply.send(sandboxHtml);
-    },
-  );
+    void reply.type("text/html");
+    return reply.send(sandboxHtml);
+  });
 };
 
 const startMcpServerRuntime = async (

@@ -11,6 +11,7 @@ const UI_EXTENSION_CAPABILITIES = {
     mimeTypes: ["text/html;profile=mcp-app"] as const,
   },
 } as const;
+
 import {
   type McpUiResourceCsp,
   type McpUiResourcePermissions,

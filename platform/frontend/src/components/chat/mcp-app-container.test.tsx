@@ -21,9 +21,7 @@ vi.mock("@modelcontextprotocol/ext-apps/app-bridge", () => ({
     this.oninitialized = null;
     this.onsandboxready = null;
     this.connect = vi.fn().mockReturnValue(Promise.resolve());
-    this.sendSandboxResourceReady = vi
-      .fn()
-      .mockReturnValue(Promise.resolve());
+    this.sendSandboxResourceReady = vi.fn().mockReturnValue(Promise.resolve());
     this.sendToolInput = vi.fn().mockReturnValue(Promise.resolve());
     this.sendToolInputPartial = vi.fn().mockReturnValue(Promise.resolve());
     this.sendToolResult = vi.fn().mockReturnValue(Promise.resolve());

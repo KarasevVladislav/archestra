@@ -10,6 +10,7 @@ const UI_EXTENSION_CAPABILITIES = {
     mimeTypes: ["text/html;profile=mcp-app"] as const,
   },
 } as const;
+
 import { UnauthorizedError } from "@modelcontextprotocol/sdk/client/auth.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import {

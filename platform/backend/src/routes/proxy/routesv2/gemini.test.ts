@@ -226,115 +226,107 @@ describe("Gemini V2 streaming mode", () => {
     expect(typeof interaction.baselineCost).toBe("string");
   });
 
-  test(
-    "streaming mode interrupted handles gracefully",
-    {
-      timeout: 10000,
-    },
-    async ({ makeAgent }) => {
-      const app = Fastify().withTypeProvider<ZodTypeProvider>();
-      app.setValidatorCompiler(validatorCompiler);
-      app.setSerializerCompiler(serializerCompiler);
+  test("streaming mode interrupted handles gracefully", {
+    timeout: 10000,
+  }, async ({ makeAgent }) => {
+    const app = Fastify().withTypeProvider<ZodTypeProvider>();
+    app.setValidatorCompiler(validatorCompiler);
+    app.setSerializerCompiler(serializerCompiler);
 
-      // Configure stub to interrupt at chunk 2 (before final usage chunk).
-      geminiStubOptions.interruptAtChunk = 2;
+    // Configure stub to interrupt at chunk 2 (before final usage chunk).
+    geminiStubOptions.interruptAtChunk = 2;
 
-      await app.register(geminiProxyRoutesV2);
+    await app.register(geminiProxyRoutesV2);
 
-      await ModelModel.upsert({
-        externalId: "gemini/gemini-2.5-pro",
-        provider: "gemini",
-        modelId: "gemini-2.5-pro",
-        inputModalities: null,
-        outputModalities: null,
-        customPricePerMillionInput: "1.25",
-        customPricePerMillionOutput: "5.00",
-        lastSyncedAt: new Date(),
-      });
+    await ModelModel.upsert({
+      externalId: "gemini/gemini-2.5-pro",
+      provider: "gemini",
+      modelId: "gemini-2.5-pro",
+      inputModalities: null,
+      outputModalities: null,
+      customPricePerMillionInput: "1.25",
+      customPricePerMillionOutput: "5.00",
+      lastSyncedAt: new Date(),
+    });
 
-      const agent = await makeAgent({
-        name: "Test Interrupted Streaming Agent",
-      });
+    const agent = await makeAgent({
+      name: "Test Interrupted Streaming Agent",
+    });
 
-      const response = await app.inject({
-        method: "POST",
-        url: `/v1/gemini/${agent.id}/v1beta/models/gemini-2.5-pro:streamGenerateContent`,
-        headers: {
-          "content-type": "application/json",
-          "x-goog-api-key": "test-key",
-        },
-        payload: {
-          contents: [
-            {
-              role: "user",
-              parts: [{ text: "Hello!" }],
-            },
-          ],
-        },
-      });
+    const response = await app.inject({
+      method: "POST",
+      url: `/v1/gemini/${agent.id}/v1beta/models/gemini-2.5-pro:streamGenerateContent`,
+      headers: {
+        "content-type": "application/json",
+        "x-goog-api-key": "test-key",
+      },
+      payload: {
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: "Hello!" }],
+          },
+        ],
+      },
+    });
 
-      // Request should complete without error even when stream is interrupted
-      expect(response.statusCode).toBe(200);
+    // Request should complete without error even when stream is interrupted
+    expect(response.statusCode).toBe(200);
 
-      // Response should have partial SSE data
-      expect(response.body).toContain("data: ");
-    },
-  );
+    // Response should have partial SSE data
+    expect(response.body).toContain("data: ");
+  });
 
-  test(
-    "streaming mode interrupted before usage handles gracefully",
-    {
-      timeout: 10000,
-    },
-    async ({ makeAgent }) => {
-      const app = Fastify().withTypeProvider<ZodTypeProvider>();
-      app.setValidatorCompiler(validatorCompiler);
-      app.setSerializerCompiler(serializerCompiler);
+  test("streaming mode interrupted before usage handles gracefully", {
+    timeout: 10000,
+  }, async ({ makeAgent }) => {
+    const app = Fastify().withTypeProvider<ZodTypeProvider>();
+    app.setValidatorCompiler(validatorCompiler);
+    app.setSerializerCompiler(serializerCompiler);
 
-      // Configure stub to interrupt at chunk 1 (before any usage data).
-      geminiStubOptions.interruptAtChunk = 1;
+    // Configure stub to interrupt at chunk 1 (before any usage data).
+    geminiStubOptions.interruptAtChunk = 1;
 
-      await app.register(geminiProxyRoutesV2);
+    await app.register(geminiProxyRoutesV2);
 
-      await ModelModel.upsert({
-        externalId: "gemini/gemini-2.5-pro",
-        provider: "gemini",
-        modelId: "gemini-2.5-pro",
-        inputModalities: null,
-        outputModalities: null,
-        customPricePerMillionInput: "1.25",
-        customPricePerMillionOutput: "5.00",
-        lastSyncedAt: new Date(),
-      });
+    await ModelModel.upsert({
+      externalId: "gemini/gemini-2.5-pro",
+      provider: "gemini",
+      modelId: "gemini-2.5-pro",
+      inputModalities: null,
+      outputModalities: null,
+      customPricePerMillionInput: "1.25",
+      customPricePerMillionOutput: "5.00",
+      lastSyncedAt: new Date(),
+    });
 
-      const agent = await makeAgent({
-        name: "Test Interrupted Before Usage Agent",
-      });
+    const agent = await makeAgent({
+      name: "Test Interrupted Before Usage Agent",
+    });
 
-      const response = await app.inject({
-        method: "POST",
-        url: `/v1/gemini/${agent.id}/v1beta/models/gemini-2.5-pro:streamGenerateContent`,
-        headers: {
-          "content-type": "application/json",
-          "x-goog-api-key": "test-key",
-        },
-        payload: {
-          contents: [
-            {
-              role: "user",
-              parts: [{ text: "Hello!" }],
-            },
-          ],
-        },
-      });
+    const response = await app.inject({
+      method: "POST",
+      url: `/v1/gemini/${agent.id}/v1beta/models/gemini-2.5-pro:streamGenerateContent`,
+      headers: {
+        "content-type": "application/json",
+        "x-goog-api-key": "test-key",
+      },
+      payload: {
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: "Hello!" }],
+          },
+        ],
+      },
+    });
 
-      // Request should complete without error even when stream is interrupted
-      expect(response.statusCode).toBe(200);
+    // Request should complete without error even when stream is interrupted
+    expect(response.statusCode).toBe(200);
 
-      // Response should have partial SSE data
-      expect(response.body).toContain("data: ");
-    },
-  );
+    // Response should have partial SSE data
+    expect(response.body).toContain("data: ");
+  });
 });
 
 describe("Gemini V2 proxy routing", () => {

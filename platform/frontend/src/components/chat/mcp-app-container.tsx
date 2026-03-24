@@ -1,13 +1,13 @@
-import {
-  AppBridge,
-  PostMessageTransport,
-} from "@modelcontextprotocol/ext-apps/app-bridge";
 import type {
   McpUiDisplayMode,
   McpUiResourceCsp,
   McpUiResourcePermissions,
   McpUiStyles,
 } from "@modelcontextprotocol/ext-apps";
+import {
+  AppBridge,
+  PostMessageTransport,
+} from "@modelcontextprotocol/ext-apps/app-bridge";
 import { useTheme } from "next-themes";
 import type React from "react";
 import { Component, useEffect, useMemo, useRef, useState } from "react";
@@ -542,10 +542,9 @@ function SandboxIframe({
         window.removeEventListener("message", onMessage);
 
         // Connect AppBridge via PostMessageTransport
-        const transport = new PostMessageTransport(
-          iframe.contentWindow!,
-          iframe.contentWindow!,
-        );
+        // contentWindow is guaranteed non-null here (checked in event.source === iframe.contentWindow above)
+        const cw = iframe.contentWindow as Window;
+        const transport = new PostMessageTransport(cw, cw);
         appBridge
           .connect(transport)
           .then(() => {
@@ -553,8 +552,7 @@ function SandboxIframe({
           })
           .catch((err) => {
             if (!cancelled) {
-              const error =
-                err instanceof Error ? err : new Error(String(err));
+              const error = err instanceof Error ? err : new Error(String(err));
               setError(error);
               onErrorRef.current?.(error);
             }
@@ -572,7 +570,7 @@ function SandboxIframe({
       iframe.remove();
       iframeRef.current = null;
     };
-  }, [sandboxUrl.href, appBridge]);
+  }, [sandboxUrl.href, appBridge, useDedicatedOrigin]);
 
   // Set up size change and initialized handlers
   useEffect(() => {
@@ -616,17 +614,24 @@ function SandboxIframe({
   useEffect(() => {
     if (!ready || !initialized || !toolResult) return;
     // Cast needed: our McpCallToolResult is looser than the SDK's strict union type
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // biome-ignore lint/suspicious/noExplicitAny: McpCallToolResult is structurally compatible but TypeScript can't prove it
     appBridge.sendToolResult(toolResult as any);
   }, [ready, initialized, toolResult, appBridge]);
 
   return (
     <div
       ref={containerRef}
-      style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+      }}
     >
       {error && (
-        <div style={{ color: "red", padding: "1rem" }}>Error: {error.message}</div>
+        <div style={{ color: "red", padding: "1rem" }}>
+          Error: {error.message}
+        </div>
       )}
     </div>
   );

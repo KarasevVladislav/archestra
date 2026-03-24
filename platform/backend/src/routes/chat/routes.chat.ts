@@ -494,8 +494,7 @@ const chatRoutes: FastifyPluginAsyncZod = async (fastify) => {
                         data: {
                           toolCallId: chunk.id,
                           toolName: chunk.toolName,
-                          uiResourceUri:
-                            toolUiResourceUris[chunk.toolName],
+                          uiResourceUri: toolUiResourceUris[chunk.toolName],
                           html: prefetched.html,
                           csp: prefetched.csp,
                           permissions: prefetched.permissions,
@@ -504,7 +503,6 @@ const chatRoutes: FastifyPluginAsyncZod = async (fastify) => {
                     }
                   }
                 };
-
 
                 // ⚠️ TEMPORARY: Error injection for testing retries. Remove after testing.
                 const lastMsg = (
@@ -721,7 +719,6 @@ const chatRoutes: FastifyPluginAsyncZod = async (fastify) => {
                     } satisfies TokenUsage,
                   });
                 }
-
               },
             }),
           });
