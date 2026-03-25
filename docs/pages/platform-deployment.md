@@ -28,7 +28,7 @@ Run the platform with a single command:
 
 ```bash
 docker pull archestra/platform:latest;
-docker run -p 9000:9000 -p 3000:3000 -p 3002:3002 \
+docker run -p 9000:9000 -p 3000:3000\
    -e ARCHESTRA_QUICKSTART=true \
    -v /var/run/docker.sock:/var/run/docker.sock \
    -v archestra-postgres-data:/var/lib/postgresql/data \
@@ -40,7 +40,7 @@ docker run -p 9000:9000 -p 3000:3000 -p 3002:3002 \
 
 ```powershell
 docker pull archestra/platform:latest;
-docker run -p 9000:9000 -p 3000:3000 -p 3002:3002 `
+docker run -p 9000:9000 -p 3000:3000`
    -e ARCHESTRA_QUICKSTART=true `
    -v /var/run/docker.sock:/var/run/docker.sock `
    -v archestra-postgres-data:/var/lib/postgresql/data `
@@ -62,7 +62,7 @@ This will start the platform with:
 If you have Kubernetes installed locally, you can use it for the MCP orchestrator. Make sure `kubectl` points to the right cluster and run the container without the socket and without `ARCHESTRA_QUICKSTART`. The orchestrator will create a cluster in the current context. See [Development with Standalone Kubernetes](./platform-orchestrator#local-development-with-docker-and-standalone-kubernetes)
 
 ```diff
-docker run -p 9000:9000 -p 3000:3000 -p 3002:3002 \
+docker run -p 9000:9000 -p 3000:3000\
 -  -e ARCHESTRA_QUICKSTART=true \
 -  -v /var/run/docker.sock:/var/run/docker.sock \
    -v archestra-postgres-data:/var/lib/postgresql/data \

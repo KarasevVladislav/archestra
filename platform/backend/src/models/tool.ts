@@ -379,9 +379,9 @@ class ToolModel {
   }
 
   /**
-   * Find a tool by name that is assigned to a specific agent.
-   * Scopes the lookup through the agent_tools junction table to avoid
-   * cross-org ambiguity when multiple orgs share the same tool name.
+   * Find a tool by name, only if it is assigned to the given agent.
+   * Used for authorization (verify a tool call targets an allowed tool)
+   * and metadata retrieval (tool annotations for LLM hints).
    */
   static async findByNameForAgent(
     name: string,
@@ -937,9 +937,9 @@ class ToolModel {
 
   /**
    * Find an agent-assigned MCP tool by its unprefixed name suffix.
-   * Matches tools where name ends with "__<toolNameSuffix>".
-   * Used when MCP App iframes call oncalltool with the raw tool name
-   * (without the server prefix), e.g. "refresh-stats" → "system__refresh-stats".
+   * Mirrors {@link getMcpToolsAssignedToAgent} but matches via RIGHT() suffix
+   * instead of exact name, for when MCP App iframes call oncalltool with the
+   * raw tool name (e.g. "refresh-stats" → "system__refresh-stats").
    */
   static async getMcpToolsAssignedToAgentBySuffix(
     toolNameSuffix: string,
