@@ -334,9 +334,20 @@ jobs:
             shard: ""
             extra_args: "--workers=1"
             artifact: blob-report-ui-identity-providers
-          # Firefox and WebKit tests are excluded from PR/merge-queue CI.
-          # They run on a nightly schedule (see nightly-cross-browser-tests.yml)
-          # to avoid 2 extra 16-vCPU Kind clusters per CI run for ~7 tests.
+          # Firefox tests - run sequentially to avoid race conditions on shared backend state
+          - name: UI Firefox
+            runner: blacksmith-16vcpu-ubuntu-2404
+            projects: firefox
+            shard: ""
+            extra_args: "--grep '@firefox' --workers=1"
+            artifact: blob-report-ui-firefox
+          # Webkit tests - run sequentially to avoid race conditions on shared backend state
+          - name: UI Webkit
+            runner: blacksmith-16vcpu-ubuntu-2404
+            projects: webkit
+            shard: ""
+            extra_args: "--grep '@webkit' --workers=1"
+            artifact: blob-report-ui-webkit
           # Vault tests - isolated to avoid race conditions with secrets manager switching
           # Uses READONLY_VAULT so all replicas start in BYOS mode (in-memory initializeSecretsManager
           # only affects one replica, which fails with replicaCount > 1)
