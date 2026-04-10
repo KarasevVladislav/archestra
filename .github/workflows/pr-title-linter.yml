@@ -18,8 +18,8 @@ jobs:
     name: PR Title Linter
     runs-on: blacksmith-2vcpu-ubuntu-2404
     permissions:
-      contents: read
-      pull-requests: read
+      contents: read # Required to checkout the repository and read commitlint config.
+      pull-requests: read # Required by lint-pr-title to read PR metadata.
     steps:
       - name: Checkout project
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
