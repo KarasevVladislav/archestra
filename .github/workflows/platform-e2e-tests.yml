@@ -1,23 +1,24 @@
-name: Platform E2E Tests (On Demand)
+name: Platform E2E Tests
 
-# On-demand E2E: add the "run-e2e" label to a PR to trigger the full E2E suite.
-# Runs natively on the PR branch with full secrets. Remove and re-add the label
-# to re-trigger after new commits.
+# Runs automatically in merge queue as the required E2E gate.
+# For PRs, add the "run-e2e" label to trigger the full E2E suite on demand.
+# Remove and re-add the label to re-trigger after new commits.
 on:
   pull_request:
     types:
       - labeled
+  merge_group:
 
 permissions: {}
 
 concurrency:
-  group: "platform-e2e-tests-on-demand-${{ github.event.pull_request.number }}"
+  group: "platform-e2e-tests-${{ github.event.pull_request.number || github.event.merge_group.head_sha || github.ref }}"
   cancel-in-progress: true
 
 jobs:
-  platform-e2e-tests-on-demand:
-    name: Platform E2E Tests (On Demand)
-    if: github.event.label.name == 'run-e2e'
+  platform-e2e-tests:
+    name: Platform E2E Tests
+    if: ${{ github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.label.name == 'run-e2e') }}
     permissions:
       contents: write # Required for release-please codegen commits and checked-in report artifacts.
       security-events: write # Required for Docker Scout SARIF uploads.
@@ -26,7 +27,7 @@ jobs:
     uses: ./.github/workflows/platform-linting-and-tests.yml
     with:
       should-skip-running-and-always-succeed: false
-      is-fork-pr: ${{ github.event.pull_request.head.repo.fork == true }}
+      is-fork-pr: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true }}
     secrets:
       TURBOREPO_REMOTE_CACHING_TOKEN: ${{ secrets.TURBOREPO_REMOTE_CACHING_TOKEN }}
       TURBOREPO_REMOTE_CACHING_TEAM: ${{ secrets.TURBOREPO_REMOTE_CACHING_TEAM }}
