@@ -139,6 +139,47 @@ describe("restoreRenderableAssistantParts", () => {
     ]);
   });
 
+  test("does not restore tool-rich assistant content onto a re-keyed assistant message", () => {
+    const previousMessages = [
+      {
+        id: "user-1",
+        role: "user",
+        parts: [{ type: "text", text: "route me somewhere" }],
+      },
+      {
+        id: "assistant-temp-id",
+        role: "assistant",
+        parts: [
+          { type: "step-start" },
+          {
+            type: "tool-archestra__list_agents",
+            toolCallId: "tool-1",
+            state: "output-available",
+            input: {},
+            output: { ok: true },
+          },
+          {
+            type: "text",
+            text: "I'll route you to another agent.",
+          },
+        ],
+      },
+    ] as UIMessage[];
+
+    const nextMessages = [
+      previousMessages[0],
+      {
+        id: "assistant-final-id",
+        role: "assistant",
+        parts: [{ type: "text", text: "" }],
+      },
+    ] as UIMessage[];
+
+    expect(
+      restoreRenderableAssistantParts({ previousMessages, nextMessages }),
+    ).toBe(nextMessages);
+  });
+
   test("does not restore by position when earlier messages changed", () => {
     const previousMessages = [
       {

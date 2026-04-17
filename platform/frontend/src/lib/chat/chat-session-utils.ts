@@ -86,6 +86,7 @@ function findPreviousRenderableAssistantMessage(params: {
   if (
     index > 0 &&
     previousMessageAtIndex?.role === "assistant" &&
+    isSafeToRestoreByPosition(previousMessageAtIndex) &&
     nextMessages
       .slice(0, index)
       .every(
@@ -136,4 +137,17 @@ function restoreTruncatedAssistantTail(params: {
 
 function sameMessageIdentity(a: UIMessage, b: UIMessage | undefined): boolean {
   return !!b && a.id === b.id && a.role === b.role;
+}
+
+function isSafeToRestoreByPosition(message: UIMessage): boolean {
+  return (message.parts ?? []).every((part) => {
+    switch (part.type) {
+      case "text":
+      case "reasoning":
+      case "file":
+        return true;
+      default:
+        return false;
+    }
+  });
 }
