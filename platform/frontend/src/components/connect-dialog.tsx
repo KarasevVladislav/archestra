@@ -29,6 +29,7 @@ interface ConnectDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   docsPage: DocsPage;
+  description?: ReactNode;
   children: ReactNode;
 }
 
@@ -37,6 +38,7 @@ export function ConnectDialog({
   open,
   onOpenChange,
   docsPage,
+  description,
   children,
 }: ConnectDialogProps) {
   const docsUrl = getFrontendDocsUrl(docsPage);
@@ -57,6 +59,7 @@ export function ConnectDialog({
           </span>
         </div>
       }
+      description={description}
       size="large"
       className="h-auto max-h-[90vh]"
     >

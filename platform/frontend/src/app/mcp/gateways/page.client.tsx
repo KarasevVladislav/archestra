@@ -541,6 +541,14 @@ function GatewayConnectionColumns({
 }) {
   const [activeTab, setActiveTab] = useState<"proxy" | "mcp">("mcp");
 
+  if (agentType !== "profile") {
+    return (
+      <div className="min-w-0">
+        <McpConnectionInstructions agentId={agentId} hideProfileSelector />
+      </div>
+    );
+  }
+
   return (
     <Tabs
       value={activeTab}
@@ -549,19 +557,9 @@ function GatewayConnectionColumns({
     >
       <ConnectDialogSection
         title="Connection Mode"
-        description={
-          agentType === "profile"
-            ? "Choose whether to connect through the MCP Gateway or the LLM Proxy."
-            : "Connect through the MCP Gateway to expose tools with unified discovery and observability."
-        }
+        description="Choose whether to connect through the MCP Gateway or the LLM Proxy."
       >
-        <TabsList
-          className={
-            agentType === "profile"
-              ? "grid h-auto w-full grid-cols-2 gap-2 bg-transparent p-0"
-              : "grid h-auto w-full grid-cols-1 gap-2 bg-transparent p-0"
-          }
-        >
+        <TabsList className="grid h-auto w-full grid-cols-2 gap-2 bg-transparent p-0">
           <TabsTrigger
             value="mcp"
             className="flex h-auto min-h-20 flex-col items-start gap-2 rounded-lg border px-4 py-3 text-left data-[state=active]:border-green-500/30 data-[state=active]:bg-green-500/5 data-[state=active]:shadow-none"
@@ -582,27 +580,25 @@ function GatewayConnectionColumns({
             </div>
           </TabsTrigger>
 
-          {agentType === "profile" ? (
-            <TabsTrigger
-              value="proxy"
-              className="flex h-auto min-h-20 flex-col items-start gap-2 rounded-lg border px-4 py-3 text-left data-[state=active]:border-blue-500/30 data-[state=active]:bg-blue-500/5 data-[state=active]:shadow-none"
-            >
-              <div className="flex items-center gap-2">
-                <Server className="h-4 w-4 text-blue-500" />
-                <span className="font-medium">LLM Proxy</span>
+          <TabsTrigger
+            value="proxy"
+            className="flex h-auto min-h-20 flex-col items-start gap-2 rounded-lg border px-4 py-3 text-left data-[state=active]:border-blue-500/30 data-[state=active]:bg-blue-500/5 data-[state=active]:shadow-none"
+          >
+            <div className="flex items-center gap-2">
+              <Server className="h-4 w-4 text-blue-500" />
+              <span className="font-medium">LLM Proxy</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              <div className="flex items-center gap-1 rounded-full border bg-background/60 px-2 py-1 text-[10px]">
+                <Eye className="h-2.5 w-2.5 text-purple-600 dark:text-purple-400" />
+                <span>Observability</span>
               </div>
-              <div className="flex flex-wrap gap-1.5">
-                <div className="flex items-center gap-1 rounded-full border bg-background/60 px-2 py-1 text-[10px]">
-                  <Eye className="h-2.5 w-2.5 text-purple-600 dark:text-purple-400" />
-                  <span>Observability</span>
-                </div>
-                <div className="flex items-center gap-1 rounded-full border bg-background/60 px-2 py-1 text-[10px]">
-                  <DollarSign className="h-2.5 w-2.5 text-green-600 dark:text-green-400" />
-                  <span>Cost</span>
-                </div>
+              <div className="flex items-center gap-1 rounded-full border bg-background/60 px-2 py-1 text-[10px]">
+                <DollarSign className="h-2.5 w-2.5 text-green-600 dark:text-green-400" />
+                <span>Cost</span>
               </div>
-            </TabsTrigger>
-          ) : null}
+            </div>
+          </TabsTrigger>
         </TabsList>
       </ConnectDialogSection>
 
@@ -617,18 +613,16 @@ function GatewayConnectionColumns({
         </ConnectDialogSection>
       </TabsContent>
 
-      {agentType === "profile" ? (
-        <TabsContent value="proxy" className="mt-0">
-          <ConnectDialogSection
-            title="LLM Proxy Instructions"
-            description="Choose a provider and point your client at the proxy for model requests."
-          >
-            <div className="min-w-0">
-              <ProxyConnectionInstructions agentId={agentId} />
-            </div>
-          </ConnectDialogSection>
-        </TabsContent>
-      ) : null}
+      <TabsContent value="proxy" className="mt-0">
+        <ConnectDialogSection
+          title="LLM Proxy Instructions"
+          description="Choose a provider and point your client at the proxy for model requests."
+        >
+          <div className="min-w-0">
+            <ProxyConnectionInstructions agentId={agentId} />
+          </div>
+        </ConnectDialogSection>
+      </TabsContent>
     </Tabs>
   );
 }
@@ -652,6 +646,11 @@ function ConnectGatewayDialog({
       open={open}
       onOpenChange={onOpenChange}
       docsPage="platform-mcp-gateway"
+      description={
+        agent.agentType === "profile"
+          ? undefined
+          : "Connect through the MCP Gateway to expose tools with unified discovery and observability."
+      }
     >
       <GatewayConnectionColumns
         agentId={agent.id}
