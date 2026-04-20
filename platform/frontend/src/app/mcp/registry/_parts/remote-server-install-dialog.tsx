@@ -99,7 +99,9 @@ export function RemoteServerInstallDialog({
   >({});
 
   const byosEnabled = useFeature("byosEnabled");
-  const { data: teamsWithVault } = useTeamsWithVaultFolders();
+  const { data: teamsWithVault } = useTeamsWithVaultFolders({
+    enabled: byosEnabled,
+  });
   const vaultTeams = teamsWithVault?.filter((t) => t.vaultPath);
 
   // Helper to update vault secret for a specific field

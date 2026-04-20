@@ -46,10 +46,13 @@ export function useTeamsPaginated(params: TeamsPaginatedParams) {
 
 /**
  * Hook to get teams with their vault folder paths
- * Fetches teams first, then fetches vault folders for each team in parallel
+ * Fetches teams first, then fetches vault folders for each team in parallel.
+ * Pass `enabled: false` to skip the vault-folder calls (e.g. when BYOS is off,
+ * the backend returns 403 for every vault-folder request).
  */
-export function useTeamsWithVaultFolders() {
-  const { data: teams, isLoading: isLoadingTeams } = useTeams();
+export function useTeamsWithVaultFolders(params?: { enabled?: boolean }) {
+  const enabled = params?.enabled ?? true;
+  const { data: teams, isLoading: isLoadingTeams } = useTeams({ enabled });
 
   const vaultFolderQueries = useQueries({
     queries: (teams || []).map((team) => ({
@@ -60,7 +63,7 @@ export function useTeamsWithVaultFolders() {
         });
         return { teamId: team.id, vaultPath: data?.vaultPath ?? null };
       },
-      enabled: !!teams,
+      enabled: enabled && !!teams,
     })),
   });
 

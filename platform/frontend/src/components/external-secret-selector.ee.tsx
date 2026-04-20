@@ -48,12 +48,12 @@ export default function ExternalSecretSelector({
 }: ExternalSecretSelectorProps) {
   const byosEnabled = useFeature("byosEnabled");
   const { data: teamsWithVaultPaths, isLoading: isLoadingTeams } =
-    useTeamsWithVaultFolders();
+    useTeamsWithVaultFolders({ enabled: byosEnabled });
   const {
     data: vaultFolder,
     isLoading: isLoadingVaultFolder,
     error: vaultFolderError,
-  } = useTeamVaultFolder(selectedTeamId);
+  } = useTeamVaultFolder(byosEnabled ? selectedTeamId : null);
   const {
     data: secrets,
     isLoading: isLoadingSecrets,
