@@ -7,10 +7,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { A2AConnectionInstructions } from "@/components/a2a-connection-instructions";
 import { AgentIcon, type AgentIconVariant } from "@/components/agent-icon";
 import type { ArchitectureTabType } from "@/components/architecture-diagram/architecture-diagram";
+import { LlmProxyFlow } from "@/components/llm-proxy/llm-proxy-flow";
 import { McpClientInstructions } from "@/components/mcp-client-instructions";
 import { McpClientPicker } from "@/components/mcp-client-picker";
 import { McpServersGrid } from "@/components/mcp-servers-grid";
-import { ProxyConnectionInstructions } from "@/components/proxy-connection-instructions";
 import {
   Select,
   SelectContent,
@@ -100,6 +100,8 @@ export default function ConnectionPage() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab");
+  const idParam = searchParams.get("id");
+  const fromTable = searchParams.get("from") === "table";
 
   const [gatewayType, setGatewayType] = useState<GatewayType>(
     tabParam === "mcp" ? "mcp" : tabParam === "a2a" ? "a2a" : "proxy",
@@ -111,11 +113,14 @@ export default function ConnectionPage() {
     }
   }, [tabParam]);
 
-  const selectGatewayType = useCallback(
-    (next: GatewayType) => {
-      setGatewayType(next);
+  const updateUrl = useCallback(
+    (next: { tab?: GatewayType; id?: string | null }) => {
       const params = new URLSearchParams(searchParams.toString());
-      params.set("tab", next);
+      if (next.tab !== undefined) params.set("tab", next.tab);
+      if (next.id !== undefined) {
+        if (next.id) params.set("id", next.id);
+        else params.delete("id");
+      }
       router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     },
     [pathname, router, searchParams],
@@ -150,6 +155,72 @@ export default function ConnectionPage() {
   const selectedA2aAgent =
     internalAgents?.find((a) => a.id === effectiveA2aAgentId) ?? null;
 
+  // Hydrate selection from `id` URL param once the relevant list has loaded.
+  useEffect(() => {
+    if (!idParam) return;
+    if (gatewayType === "mcp" && mcpGateways?.some((g) => g.id === idParam)) {
+      setSelectedMcpGatewayId(idParam);
+    } else if (
+      gatewayType === "proxy" &&
+      llmProxies?.some((p) => p.id === idParam)
+    ) {
+      setSelectedLlmProxyId(idParam);
+    } else if (
+      gatewayType === "a2a" &&
+      internalAgents?.some((a) => a.id === idParam)
+    ) {
+      setSelectedA2aAgentId(idParam);
+    }
+  }, [idParam, gatewayType, mcpGateways, llmProxies, internalAgents]);
+
+  // Keep `id` param in sync with the effective selection for the active tab.
+  const effectiveSelectedId =
+    gatewayType === "mcp"
+      ? effectiveMcpGatewayId
+      : gatewayType === "proxy"
+        ? effectiveLlmProxyId
+        : effectiveA2aAgentId;
+  useEffect(() => {
+    if (idParam || !effectiveSelectedId) return;
+    updateUrl({ id: effectiveSelectedId });
+  }, [effectiveSelectedId, idParam, updateUrl]);
+
+  const selectGatewayType = useCallback(
+    (next: GatewayType) => {
+      setGatewayType(next);
+      const nextId =
+        next === "mcp"
+          ? effectiveMcpGatewayId
+          : next === "proxy"
+            ? effectiveLlmProxyId
+            : effectiveA2aAgentId;
+      updateUrl({ tab: next, id: nextId });
+    },
+    [effectiveMcpGatewayId, effectiveLlmProxyId, effectiveA2aAgentId, updateUrl],
+  );
+
+  const handleSelectMcpGateway = useCallback(
+    (id: string) => {
+      setSelectedMcpGatewayId(id);
+      updateUrl({ id });
+    },
+    [updateUrl],
+  );
+  const handleSelectLlmProxy = useCallback(
+    (id: string) => {
+      setSelectedLlmProxyId(id);
+      updateUrl({ id });
+    },
+    [updateUrl],
+  );
+  const handleSelectA2aAgent = useCallback(
+    (id: string) => {
+      setSelectedA2aAgentId(id);
+      updateUrl({ id });
+    },
+    [updateUrl],
+  );
+
   const [clientId, setClientId] = useState<string>(MCP_CLIENTS[0].id);
   const selectedClient = getMcpClient(clientId) ?? MCP_CLIENTS[0];
 
@@ -160,13 +231,15 @@ export default function ConnectionPage() {
       {/* Sticky top bar: back link + gateway type selector + instance picker */}
       <div className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/70">
         <div className="mx-auto flex w-full max-w-[1680px] flex-wrap items-center gap-3 px-6 py-3">
-          <Link
-            href={BACK_LINK[gatewayType].href}
-            className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            {BACK_LINK[gatewayType].label}
-          </Link>
+          {fromTable && (
+            <Link
+              href={BACK_LINK[gatewayType].href}
+              className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              {BACK_LINK[gatewayType].label}
+            </Link>
+          )}
 
           <div className="ml-auto inline-flex rounded-lg border bg-muted/60 p-1">
             {GATEWAY_TYPES.map((t) => (
@@ -177,7 +250,7 @@ export default function ConnectionPage() {
                 className={cn(
                   "inline-flex items-center gap-2 rounded-md px-3.5 py-1.5 text-sm font-medium transition-all",
                   gatewayType === t.id
-                    ? "bg-background text-foreground shadow-sm"
+                    ? "bg-card text-foreground"
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
@@ -197,7 +270,7 @@ export default function ConnectionPage() {
               <InstanceSelect
                 label="MCP Gateway"
                 value={effectiveMcpGatewayId ?? ""}
-                onChange={setSelectedMcpGatewayId}
+                onChange={handleSelectMcpGateway}
                 fallbackType="mcp_gateway"
                 items={
                   mcpGateways?.map((g) => ({
@@ -221,7 +294,7 @@ export default function ConnectionPage() {
               <InstanceSelect
                 label="LLM Proxy"
                 value={effectiveLlmProxyId ?? ""}
-                onChange={setSelectedLlmProxyId}
+                onChange={handleSelectLlmProxy}
                 fallbackType="llm_proxy"
                 items={
                   llmProxies?.map((p) => ({
@@ -245,7 +318,7 @@ export default function ConnectionPage() {
               <InstanceSelect
                 label="A2A Agent"
                 value={effectiveA2aAgentId ?? ""}
-                onChange={setSelectedA2aAgentId}
+                onChange={handleSelectA2aAgent}
                 fallbackType="agent"
                 items={
                   internalAgents?.map((a) => ({
@@ -287,12 +360,10 @@ export default function ConnectionPage() {
             <>
               <McpServersGrid profileId={selectedMcpGateway.id} />
               <McpClientPicker selectedId={clientId} onSelect={setClientId} />
-              <div className="rounded-xl border bg-card p-5">
-                <McpClientInstructions
-                  client={selectedClient}
-                  profile={selectedMcpGateway}
-                />
-              </div>
+              <McpClientInstructions
+                client={selectedClient}
+                profile={selectedMcpGateway}
+              />
             </>
           ) : (
             <EmptyState message="No MCP Gateways available yet." />
@@ -301,9 +372,7 @@ export default function ConnectionPage() {
         {/* LLM Proxy flow */}
         {gatewayType === "proxy" &&
           (selectedLlmProxy ? (
-            <div className="rounded-xl border bg-card p-5">
-              <ProxyConnectionInstructions agentId={selectedLlmProxy.id} />
-            </div>
+            <LlmProxyFlow profileId={selectedLlmProxy.id} />
           ) : (
             <EmptyState message="No LLM Proxies available yet." />
           ))}

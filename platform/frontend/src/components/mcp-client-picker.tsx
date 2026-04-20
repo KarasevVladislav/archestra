@@ -53,14 +53,13 @@ function ClientTile({
         "hover:border-foreground/30",
         selected
           ? "border-primary ring-2 ring-primary/20"
-          : "border-border shadow-sm",
+          : "border-border",
       )}
     >
       <div
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md"
         style={{
           background: client.tileBg ?? "hsl(var(--muted))",
-          borderColor: "hsl(var(--border))",
           color: "hsl(var(--foreground))",
         }}
       >

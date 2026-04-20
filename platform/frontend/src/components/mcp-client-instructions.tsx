@@ -206,13 +206,11 @@ export function McpClientInstructions({
           <h3 className="text-[22px] font-bold leading-tight tracking-tight">
             Connect {client.label}
           </h3>
-          <p className="text-[13px] text-muted-foreground">
-            {client.id === "generic"
-              ? "Point any MCP-capable client at this gateway. That's it."
-              : client.quickInstall
-                ? `One click to install. ${client.tip ?? ""}`
-                : `Copy the snippet below. ${client.tip ?? ""}`}
-          </p>
+          {client.id === "generic" && (
+            <p className="text-[13px] text-muted-foreground">
+              Point any MCP-capable client at this gateway. That's it.
+            </p>
+          )}
         </div>
       </div>
 
@@ -265,7 +263,17 @@ export function McpClientInstructions({
                       {step.title}
                     </div>
                     <div className="mt-0.5 text-[12.5px] leading-[1.5] text-muted-foreground">
-                      {step.body}
+                      <FormattedStepBody
+                        text={
+                          typeof step.body === "function"
+                            ? step.body({
+                                mcpUrl,
+                                token: tokenForDisplay,
+                                serverName,
+                              })
+                            : step.body
+                        }
+                      />
                     </div>
                   </div>
                 </li>
@@ -313,12 +321,7 @@ export function McpClientInstructions({
 
           {effectiveAuth === "oauth" && client.id !== "generic" && (
             <p className="text-[12.5px] leading-relaxed text-muted-foreground">
-              Your client will perform{" "}
-              <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px] text-foreground">
-                /.well-known/oauth-authorization-server
-              </code>{" "}
-              discovery against this URL and walk the user through a browser
-              consent.
+              Your client will walk you through a browser consent.
             </p>
           )}
         </div>
@@ -347,7 +350,7 @@ function AuthSegmented({
     {
       id: "token",
       label: "Static token",
-      sub: "For headless clients",
+      sub: "",
     },
   ];
   return (
@@ -366,7 +369,7 @@ function AuthSegmented({
               className={cn(
                 "flex-1 rounded-lg px-3.5 py-2.5 text-left transition-colors",
                 active
-                  ? "bg-background shadow-sm"
+                  ? "bg-card"
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
@@ -391,6 +394,51 @@ function AuthSegmented({
       </div>
     </div>
   );
+}
+
+function FormattedStepBody({ text }: { text: string }) {
+  const tokens = parseInlineMarkup(text);
+  return (
+    <>
+      {tokens.map((tok, i) => {
+        if (tok.kind === "code") {
+          return (
+            <code
+              key={i}
+              className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[11.5px] text-foreground"
+            >
+              {tok.value}
+            </code>
+          );
+        }
+        if (tok.kind === "bold") {
+          return (
+            <strong key={i} className="font-semibold text-foreground">
+              {tok.value}
+            </strong>
+          );
+        }
+        return <span key={i}>{tok.value}</span>;
+      })}
+    </>
+  );
+}
+
+function parseInlineMarkup(
+  text: string,
+): Array<{ kind: "text" | "code" | "bold"; value: string }> {
+  const out: Array<{ kind: "text" | "code" | "bold"; value: string }> = [];
+  const regex = /`([^`]+)`|\*\*([^*]+)\*\*/g;
+  let last = 0;
+  for (const m of text.matchAll(regex)) {
+    const idx = m.index ?? 0;
+    if (idx > last) out.push({ kind: "text", value: text.slice(last, idx) });
+    if (m[1] !== undefined) out.push({ kind: "code", value: m[1] });
+    else if (m[2] !== undefined) out.push({ kind: "bold", value: m[2] });
+    last = idx + m[0].length;
+  }
+  if (last < text.length) out.push({ kind: "text", value: text.slice(last) });
+  return out;
 }
 
 function TokenSelector({
@@ -418,7 +466,7 @@ function TokenSelector({
         Select token
       </div>
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="h-auto min-h-[52px] w-full px-3.5 py-2.5">
+        <SelectTrigger className="h-auto min-h-[52px] w-full bg-card px-3.5 py-2.5">
           <SelectValue placeholder="Select token">
             <TokenTriggerLabel
               value={value}
@@ -772,11 +820,7 @@ function GenericFields({
       )}
       {authMode === "oauth" && (
         <div className="border-t p-3.5 text-[12.5px] leading-[1.5] text-muted-foreground">
-          Your client will perform{" "}
-          <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px] text-foreground">
-            /.well-known/oauth-authorization-server
-          </code>{" "}
-          discovery and walk the user through a browser consent.
+          Your client will walk you through a browser consent.
         </div>
       )}
     </div>

@@ -16,7 +16,7 @@ export interface McpClientConfigOutput {
 
 export interface McpClientStep {
   title: string;
-  body: string;
+  body: string | ((args: McpClientBuildArgs) => string);
 }
 
 export interface McpClientQuickInstall {
@@ -157,11 +157,11 @@ export const MCP_CLIENTS: McpClientDefinition[] = [
     steps: [
       {
         title: "Add the gateway",
-        body: "Run the generated command. Claude Code stores it under ~/.claude.json.",
+        body: "Run the generated command.",
       },
       {
         title: "Verify",
-        body: "Type /mcp inside Claude Code to confirm the gateway is online.",
+        body: "Type `/mcp` inside Claude Code to confirm the gateway is online.",
       },
     ],
     oauthSteps: [
@@ -171,21 +171,21 @@ export const MCP_CLIENTS: McpClientDefinition[] = [
       },
       {
         title: "Authenticate via /mcp",
-        body: "Inside Claude Code, run /mcp, pick this gateway, and choose Authenticate. Complete the browser sign-in to finish OAuth.",
+        body: "Inside Claude Code, run `/mcp`, pick this gateway, and choose **Authenticate**. Complete the browser sign-in to finish OAuth.",
       },
       {
         title: "Verify",
-        body: "Run /mcp again — the server should show as connected.",
+        body: "Run `/mcp` again — the server should show as connected.",
       },
     ],
     tokenSteps: [
       {
         title: "Add the gateway",
-        body: "Run the generated command. Claude Code stores it under ~/.claude.json.",
+        body: "Run the generated command.",
       },
       {
         title: "Verify",
-        body: "Type /mcp inside Claude Code to confirm the gateway is online.",
+        body: "Type `/mcp` inside Claude Code to confirm the gateway is online.",
       },
     ],
     buildConfig: ({ mcpUrl, token, serverName }) => {
@@ -220,43 +220,43 @@ export const MCP_CLIENTS: McpClientDefinition[] = [
     steps: [
       {
         title: "Open Cursor settings",
-        body: "Cmd ⌘ + , → MCP → Edit mcp.json.",
+        body: "Go to **Cursor Settings → Tools & MCPs**.",
       },
       {
-        title: "Paste the config",
-        body: "Drop the snippet into your mcpServers block and save.",
+        title: "Add a new MCP server",
+        body: "Under **Installed MCP Servers**, click **New MCP Server** to open `mcp.json`, paste the snippet into the `mcpServers` block, and save.",
       },
       {
         title: "Enable the server",
-        body: "Toggle the server on under MCP Servers. Tools appear in the @-mention menu.",
+        body: "Back in **Tools & MCPs**, toggle the server on. Tools appear in the @-mention menu.",
       },
     ],
     oauthSteps: [
       {
         title: "Open Cursor settings",
-        body: "Cmd ⌘ + , → MCP → Edit mcp.json.",
+        body: "Go to **Cursor Settings → Tools & MCPs**.",
       },
       {
-        title: "Paste the config",
-        body: "Drop the snippet into your mcpServers block and save.",
+        title: "Add a new MCP server",
+        body: "Under **Installed MCP Servers**, click **New MCP Server** to open `mcp.json`, paste the snippet into the `mcpServers` block, and save.",
       },
       {
         title: "Sign in through the browser",
-        body: "Cursor shows the server as 'Needs login' under MCP Servers. Click it to launch the OAuth consent flow and authorize access.",
+        body: "Cursor shows a **Login** link next to the server in **Tools & MCPs**. Click it to complete OAuth consent in your browser — it will switch to **Logout** once authorized.",
       },
     ],
     tokenSteps: [
       {
         title: "Open Cursor settings",
-        body: "Cmd ⌘ + , → MCP → Edit mcp.json.",
+        body: "Go to **Cursor Settings → Tools & MCPs**.",
       },
       {
-        title: "Paste the config",
-        body: "Drop the snippet into your mcpServers block and save.",
+        title: "Add a new MCP server",
+        body: "Under **Installed MCP Servers**, click **New MCP Server** to open `mcp.json`, paste the snippet into the `mcpServers` block, and save.",
       },
       {
         title: "Enable the server",
-        body: "Toggle the server on under MCP Servers. Tools appear in the @-mention menu.",
+        body: "Back in **Tools & MCPs**, toggle the server on. Tools appear in the @-mention menu.",
       },
     ],
     buildConfig: buildJsonConfig,
@@ -273,7 +273,7 @@ export const MCP_CLIENTS: McpClientDefinition[] = [
     steps: [
       {
         title: "Add the gateway",
-        body: "Run the generated command. Codex stores it under ~/.codex/config.toml.",
+        body: "Run the generated command. Codex stores it under `~/.codex/config.toml`.",
       },
       {
         title: "Reload Codex",
@@ -287,7 +287,8 @@ export const MCP_CLIENTS: McpClientDefinition[] = [
       },
       {
         title: "Log in",
-        body: "Run 'codex mcp login <server>' to complete OAuth consent in your browser. Codex persists and refreshes tokens automatically.",
+        body: ({ serverName }) =>
+          `Run \`codex mcp login ${serverName}\` to complete OAuth consent in your browser. Codex persists and refreshes tokens automatically.`,
       },
       {
         title: "Reload Codex",
@@ -297,11 +298,11 @@ export const MCP_CLIENTS: McpClientDefinition[] = [
     tokenSteps: [
       {
         title: "Export your token",
-        body: "Put the token in an environment variable (e.g. ARCHESTRA_MCP_TOKEN=<value>) so Codex can read it at runtime.",
+        body: "Put the token in an environment variable (e.g. `ARCHESTRA_MCP_TOKEN=<value>`) so Codex can read it at runtime.",
       },
       {
         title: "Add the gateway",
-        body: "Run the generated command. Codex stores the server definition under ~/.codex/config.toml.",
+        body: "Run the generated command. Codex stores the server definition under `~/.codex/config.toml`.",
       },
       {
         title: "Reload Codex",
