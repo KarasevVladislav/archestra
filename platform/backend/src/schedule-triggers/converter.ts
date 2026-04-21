@@ -39,46 +39,48 @@ import type {
   ScheduleTriggerSuggestionCandidate,
 } from "./types/suggestion";
 
-function extractTextFromMessage(message: ConversationMessageLike): string {
-  if (!message.parts) return "";
-  return message.parts
-    .filter((part) => part?.type === "text" && typeof part.text === "string")
-    .map((part) => (part.text ?? "").trim())
-    .filter(Boolean)
-    .join("\n")
-    .slice(0, MAX_MESSAGE_TEXT_CHARS);
-}
-
-function findFirstUserMessageText(messages: ConversationMessageLike[]): string {
-  for (const message of messages) {
-    if (message.role !== "user") continue;
-    const text = extractTextFromMessage(message);
-    if (text) return text;
-  }
-  return "";
-}
-
-function buildSuggestedName(
-  conversationTitle: string | null,
-  fallbackPrompt: string,
-): string {
-  const trimmedTitle = conversationTitle?.trim();
-  if (trimmedTitle) {
-    return trimmedTitle.length > 80
-      ? `${trimmedTitle.slice(0, 77).trimEnd()}...`
-      : trimmedTitle;
-  }
-
-  const normalizedPrompt = fallbackPrompt.trim().replace(/\s+/g, " ");
-  if (!normalizedPrompt) {
-    return "Scheduled task";
-  }
-  return normalizedPrompt.length > 60
-    ? `${normalizedPrompt.slice(0, 57).trimEnd()}...`
-    : normalizedPrompt;
-}
-
 class ScheduleTriggerConverterService {
+  private extractTextFromMessage(message: ConversationMessageLike): string {
+    if (!message.parts) return "";
+    return message.parts
+      .filter((part) => part?.type === "text" && typeof part.text === "string")
+      .map((part) => (part.text ?? "").trim())
+      .filter(Boolean)
+      .join("\n")
+      .slice(0, MAX_MESSAGE_TEXT_CHARS);
+  }
+
+  private findFirstUserMessageText(
+    messages: ConversationMessageLike[],
+  ): string {
+    for (const message of messages) {
+      if (message.role !== "user") continue;
+      const text = this.extractTextFromMessage(message);
+      if (text) return text;
+    }
+    return "";
+  }
+
+  private buildSuggestedName(
+    conversationTitle: string | null,
+    fallbackPrompt: string,
+  ): string {
+    const trimmedTitle = conversationTitle?.trim();
+    if (trimmedTitle) {
+      return trimmedTitle.length > 80
+        ? `${trimmedTitle.slice(0, 77).trimEnd()}...`
+        : trimmedTitle;
+    }
+
+    const normalizedPrompt = fallbackPrompt.trim().replace(/\s+/g, " ");
+    if (!normalizedPrompt) {
+      return "Scheduled task";
+    }
+    return normalizedPrompt.length > 60
+      ? `${normalizedPrompt.slice(0, 57).trimEnd()}...`
+      : normalizedPrompt;
+  }
+
   private extractConversationContext(conversation: {
     title?: string | null;
     messages?: unknown[] | null;
@@ -88,8 +90,8 @@ class ScheduleTriggerConverterService {
     suggestedName: string;
   } {
     const messages = (conversation.messages ?? []) as ConversationMessageLike[];
-    const fallbackPrompt = findFirstUserMessageText(messages);
-    const suggestedName = buildSuggestedName(
+    const fallbackPrompt = this.findFirstUserMessageText(messages);
+    const suggestedName = this.buildSuggestedName(
       conversation.title ?? null,
       fallbackPrompt,
     );
@@ -607,6 +609,93 @@ class ScheduleTriggerConverterService {
     return fallbackPrompt;
   }
 
+  private async resolveAgentLlm(params: {
+    agent: Agent;
+    organizationId: string;
+    userId?: string;
+  }): Promise<{
+    provider: SupportedProvider;
+    apiKey: string | undefined;
+    modelName: string;
+    baseUrl: string | null;
+  }> {
+    const { agent, organizationId, userId } = params;
+
+    if (agent.llmApiKeyId) {
+      const apiKey = await LlmProviderApiKeyModel.findById(agent.llmApiKeyId);
+      if (apiKey) {
+        const bestModel = await LlmProviderApiKeyModelLinkModel.getBestModel(
+          apiKey.id,
+        );
+        const secretValue = apiKey.secretId
+          ? await getSecretValueForLlmProviderApiKey(apiKey.secretId)
+          : undefined;
+
+        return {
+          provider: apiKey.provider,
+          apiKey: secretValue,
+          modelName:
+            agent.llmModel ?? bestModel?.modelId ?? config.chat.defaultModel,
+          baseUrl: apiKey.baseUrl,
+        };
+      }
+    }
+
+    if (agent.llmModel) {
+      const providers = await ModelModel.findProvidersByModelId(agent.llmModel);
+
+      for (const provider of providers) {
+        const resolvedApiKey = await resolveProviderApiKey({
+          organizationId,
+          userId,
+          provider,
+        });
+        if (
+          resolvedApiKey.apiKey ||
+          !isApiKeyRequired(provider, resolvedApiKey.apiKey)
+        ) {
+          return {
+            provider,
+            apiKey: resolvedApiKey.apiKey,
+            modelName: agent.llmModel,
+            baseUrl: resolvedApiKey.baseUrl,
+          };
+        }
+      }
+
+      const fallbackProvider = config.chat.defaultProvider;
+      const fallbackResolved = await resolveProviderApiKey({
+        organizationId,
+        userId,
+        provider: fallbackProvider,
+      });
+
+      return {
+        provider: fallbackProvider,
+        apiKey:
+          fallbackResolved.apiKey ??
+          getProviderEnvApiKey(fallbackProvider),
+        modelName: agent.llmModel,
+        baseUrl: fallbackResolved.baseUrl,
+      };
+    }
+
+    const smartDefault = await resolveSmartDefaultLlm({
+      organizationId,
+      userId,
+    });
+    if (smartDefault) {
+      return smartDefault;
+    }
+
+    return {
+      provider: config.chat.defaultProvider,
+      apiKey: getProviderEnvApiKey(config.chat.defaultProvider),
+      modelName: config.chat.defaultModel,
+      baseUrl: null,
+    };
+  }
+
   private async summarizeConversationToPrompt(params: {
     messages: ConversationMessageLike[];
     agent: Agent;
@@ -621,7 +710,7 @@ class ScheduleTriggerConverterService {
       )
       .map((message) => ({
         role: message.role as "user" | "assistant",
-        text: extractTextFromMessage(message),
+        text: this.extractTextFromMessage(message),
       }))
       .filter((entry) => entry.text.length > 0);
 
@@ -641,7 +730,7 @@ class ScheduleTriggerConverterService {
       .map((entry) => `${entry.role.toUpperCase()}: ${entry.text}`)
       .join("\n\n");
 
-    const resolved = await resolveAgentLlm({
+    const resolved = await this.resolveAgentLlm({
       agent,
       organizationId,
       userId,
@@ -691,90 +780,6 @@ class ScheduleTriggerConverterService {
   }
 }
 
-async function resolveAgentLlm(params: {
-  agent: Agent;
-  organizationId: string;
-  userId?: string;
-}): Promise<{
-  provider: SupportedProvider;
-  apiKey: string | undefined;
-  modelName: string;
-  baseUrl: string | null;
-}> {
-  const { agent, organizationId, userId } = params;
-
-  if (agent.llmApiKeyId) {
-    const apiKey = await LlmProviderApiKeyModel.findById(agent.llmApiKeyId);
-    if (apiKey) {
-      const bestModel = await LlmProviderApiKeyModelLinkModel.getBestModel(
-        apiKey.id,
-      );
-      const secretValue = apiKey.secretId
-        ? await getSecretValueForLlmProviderApiKey(apiKey.secretId)
-        : undefined;
-
-      return {
-        provider: apiKey.provider,
-        apiKey: secretValue,
-        modelName:
-          agent.llmModel ?? bestModel?.modelId ?? config.chat.defaultModel,
-        baseUrl: apiKey.baseUrl,
-      };
-    }
-  }
-
-  if (agent.llmModel) {
-    const providers = await ModelModel.findProvidersByModelId(agent.llmModel);
-
-    for (const provider of providers) {
-      const resolvedApiKey = await resolveProviderApiKey({
-        organizationId,
-        userId,
-        provider,
-      });
-      if (
-        resolvedApiKey.apiKey ||
-        !isApiKeyRequired(provider, resolvedApiKey.apiKey)
-      ) {
-        return {
-          provider,
-          apiKey: resolvedApiKey.apiKey,
-          modelName: agent.llmModel,
-          baseUrl: resolvedApiKey.baseUrl,
-        };
-      }
-    }
-
-    const fallbackProvider = config.chat.defaultProvider;
-    const fallbackResolved = await resolveProviderApiKey({
-      organizationId,
-      userId,
-      provider: fallbackProvider,
-    });
-
-    return {
-      provider: fallbackProvider,
-      apiKey:
-        fallbackResolved.apiKey ??
-        getProviderEnvApiKey(fallbackProvider),
-      modelName: agent.llmModel,
-      baseUrl: fallbackResolved.baseUrl,
-    };
-  }
-
-  const smartDefault = await resolveSmartDefaultLlm({ organizationId, userId });
-  if (smartDefault) {
-    return smartDefault;
-  }
-
-  return {
-    provider: config.chat.defaultProvider,
-    apiKey: getProviderEnvApiKey(config.chat.defaultProvider),
-    modelName: config.chat.defaultModel,
-    baseUrl: null,
-  };
-}
-
 export const scheduleTriggerConverterService =
   new ScheduleTriggerConverterService();
 export type { ScheduleTriggerConverterService };
@@ -782,4 +787,4 @@ export type {
   AgentSuggestionReason,
   ScheduleTriggerSuggestion,
   ScheduleTriggerSuggestionCandidate,
-} from "./types/suggestion";
+};

@@ -91,12 +91,8 @@ export function ConvertToScheduledTaskDialog({
     return ids;
   }, [suggestion?.candidates, suggestion?.suggestedAgentId]);
 
-  // When user enables replyInSameConversation and their current selection is
-  // not allowed for the linked chat, snap once to a sensible default. Don't
-  // override subsequent manual picks.
   useEffect(() => {
-    if (!replyInSameConversation) return;
-    if (linkedAllowedAgentIds.size === 0) return;
+    if (!replyInSameConversation || linkedAllowedAgentIds.size === 0) return;
     if (agentId && linkedAllowedAgentIds.has(agentId)) return;
     const fallback =
       suggestion?.suggestedAgentId ??

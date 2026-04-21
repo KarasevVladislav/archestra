@@ -4,12 +4,6 @@ import db, { schema } from "@/database";
 /**
  * Append a user prompt + assistant reply pair to a linked conversation on
  * behalf of a scheduled task run.
- *
- * Serializes concurrent appends to the same conversation using a transaction
- * advisory lock + `MAX(createdAt)` lookup. This guarantees:
- *   - user message strictly precedes its assistant reply (+1ms apart);
- *   - parallel runs don't interleave pairs, even when triggered within the
- *     same millisecond.
  */
 export async function appendLinkedScheduleRunMessagesToConversation(params: {
   conversationId: string;
@@ -20,8 +14,7 @@ export async function appendLinkedScheduleRunMessagesToConversation(params: {
   const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
   await db.transaction(async (tx) => {
-    // Serialize appends to the same conversation so createdAt values are
-    // assigned monotonically per conversation.
+    // Serialize appends to the same conversation so createdAt values are assigned monotonically per conversation
     await tx.execute(
       sql`SELECT pg_advisory_xact_lock(hashtextextended(${conversationId}, 0))`,
     );
