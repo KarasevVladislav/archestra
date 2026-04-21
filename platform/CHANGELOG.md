@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.2.21](https://github.com/archestra-ai/archestra/compare/platform-v1.2.20...platform-v1.2.21) (2026-04-21)
+
+
+### Features
+
+* unified connect page ([#3980](https://github.com/archestra-ai/archestra/issues/3980)) ([f198391](https://github.com/archestra-ai/archestra/commit/f19839101bef8bbf339eef6df89d8184ed34408a))
+
+
+### Bug Fixes
+
+* gate team vault-folder queries on byosEnabled flag ([#3984](https://github.com/archestra-ai/archestra/issues/3984)) ([dc698bc](https://github.com/archestra-ai/archestra/commit/dc698bc08f7892c78407cc0b887a82a190b8a819))
+* IdP JWKS auth selection ([#3989](https://github.com/archestra-ai/archestra/issues/3989)) ([3bd3dcf](https://github.com/archestra-ai/archestra/commit/3bd3dcf6160122d80701e9d052a299f36be305fc))
+
+
+### Miscellaneous Chores
+
+* upgrade packages ([#3661](https://github.com/archestra-ai/archestra/issues/3661)) ([9063365](https://github.com/archestra-ai/archestra/commit/906336513ee05c63925e6b6828664c000c470d08))
+
 ## [1.2.20](https://github.com/archestra-ai/archestra/compare/platform-v1.2.19...platform-v1.2.20) (2026-04-20)
 
 
