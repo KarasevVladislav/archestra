@@ -8,14 +8,17 @@ import {
   type McpDeploymentStatusEntry,
   type ServerWebSocketMessage,
 } from "@shared";
+import { and, eq, inArray } from "drizzle-orm";
 import type { WebSocket, WebSocketServer } from "ws";
 import { WebSocket as WS, WebSocketServer as WSS } from "ws";
 import { betterAuth, hasPermission } from "@/auth";
 import config from "@/config";
+import db, { schema } from "@/database";
 import { BrowserStreamSocketClientContext } from "@/features/browser-stream/websocket/browser-stream.websocket";
 import McpServerRuntimeManager from "@/k8s/mcp-server-runtime/manager";
 import logger from "@/logging";
 import { McpServerModel, UserModel } from "@/models";
+import ConversationShareModel from "@/models/conversation-share";
 import { reportMcpDeploymentStatuses } from "@/observability/metrics/mcp";
 
 interface McpLogsSubscription {
@@ -774,6 +777,138 @@ class WebSocketService {
       { message, sentCount },
       `Sent message to ${sentCount} client(s)`,
     );
+  }
+
+  /**
+   * Notifies connected clients that a conversation should be invalidedated.
+   */
+  async notifyConversationMessagesUpdated(params: {
+    conversationId: string;
+    organizationId?: string;
+    ownerUserId?: string;
+  }): Promise<void> {
+    if (!this.wss || this.wss.clients.size === 0) {
+      return;
+    }
+
+    let conversation: {
+      id: string;
+      organizationId: string;
+      ownerUserId: string;
+    } | null = null;
+
+    if (params.organizationId && params.ownerUserId) {
+      conversation = {
+        id: params.conversationId,
+        organizationId: params.organizationId,
+        ownerUserId: params.ownerUserId,
+      };
+    } else {
+      const [row] = await db
+        .select({
+          id: schema.conversationsTable.id,
+          organizationId: schema.conversationsTable.organizationId,
+          ownerUserId: schema.conversationsTable.userId,
+        })
+        .from(schema.conversationsTable)
+        .where(eq(schema.conversationsTable.id, params.conversationId))
+        .limit(1);
+      conversation = row ?? null;
+    }
+
+    if (!conversation) {
+      return;
+    }
+
+    const share = await ConversationShareModel.findByConversationId({
+      conversationId: conversation.id,
+      organizationId: conversation.organizationId,
+    });
+
+    const message: ServerWebSocketMessage = {
+      type: "conversation_messages_updated",
+      payload: { conversationId: params.conversationId },
+    };
+
+    const inOrg = (client: WebSocket) => {
+      const ctx = this.clientContexts.get(client);
+      return ctx?.organizationId === conversation.organizationId;
+    };
+
+    if (!share) {
+      this.sendToClients(message, (client) => {
+        const ctx = this.clientContexts.get(client);
+        return inOrg(client) && ctx?.userId === conversation.ownerUserId;
+      });
+      return;
+    }
+
+    if (share.visibility === "organization") {
+      this.sendToClients(message, inOrg);
+      return;
+    }
+
+    const allowedUserIds = new Set<string>([
+      conversation.ownerUserId,
+      ...share.userIds,
+    ]);
+
+    if (share.visibility === "team") {
+      const shareTeamIds = new Set(share.teamIds);
+      const connectedUserIds = Array.from(
+        new Set(
+          [...this.wss.clients]
+            .filter((c) => c.readyState === WS.OPEN && inOrg(c))
+            .map((c) => this.clientContexts.get(c)?.userId)
+            .filter((id): id is string => id !== undefined),
+        ),
+      );
+
+      if (shareTeamIds.size > 0 && connectedUserIds.length > 0) {
+        const memberships = await db
+          .select({ userId: schema.teamMembersTable.userId })
+          .from(schema.teamMembersTable)
+          .where(
+            and(
+              inArray(schema.teamMembersTable.userId, connectedUserIds),
+              inArray(schema.teamMembersTable.teamId, [...shareTeamIds]),
+            ),
+          );
+
+        for (const row of memberships) {
+          allowedUserIds.add(row.userId);
+        }
+      }
+    }
+
+    this.sendToClients(message, (client) => {
+      const ctx = this.clientContexts.get(client);
+      return inOrg(client) && ctx !== undefined && allowedUserIds.has(ctx.userId);
+    });
+  }
+
+  notifyScheduleTriggerRunUpdated(params: {
+    organizationId: string;
+    triggerId: string;
+    runId: string;
+    notifyUserId: string;
+  }): void {
+    if (!this.wss) {
+      return;
+    }
+
+    const message: ServerWebSocketMessage = {
+      type: "schedule_trigger_run_updated",
+      payload: { triggerId: params.triggerId, runId: params.runId },
+    };
+
+    this.sendToClients(message, (client) => {
+      const ctx = this.clientContexts.get(client);
+      return (
+        ctx?.organizationId === params.organizationId &&
+        ctx.userId === params.notifyUserId
+      );
+    });
   }
 
   stop() {

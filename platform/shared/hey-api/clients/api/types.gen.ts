@@ -36771,6 +36771,7 @@ export type GetScheduleTriggersResponses = {
             actorUserId: string;
             lastExecutedAt: string | null;
             createdAt: string;
+            linkedConversationId: string | null;
             actor?: {
                 id: string;
                 name: string | null;
@@ -36884,6 +36885,7 @@ export type CreateScheduleTriggerResponses = {
         actorUserId: string;
         lastExecutedAt: string | null;
         createdAt: string;
+        linkedConversationId: string | null;
         actor?: {
             id: string;
             name: string | null;
@@ -36898,6 +36900,204 @@ export type CreateScheduleTriggerResponses = {
 };
 
 export type CreateScheduleTriggerResponse = CreateScheduleTriggerResponses[keyof CreateScheduleTriggerResponses];
+
+export type CreateScheduleTriggerFromConversationData = {
+    body: {
+        conversationId: string;
+        cronExpression: string;
+        timezone: string;
+        name?: string;
+        messageTemplate?: string;
+        agentId?: string;
+        enabled?: boolean;
+        replyInSameConversation?: boolean;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/schedule-triggers/from-conversation';
+};
+
+export type CreateScheduleTriggerFromConversationErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        error: {
+            message: string;
+            type: 'api_validation_error';
+        };
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        error: {
+            message: string;
+            type: 'api_authentication_error';
+        };
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        error: {
+            message: string;
+            type: 'api_authorization_error';
+        };
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        error: {
+            message: string;
+            type: 'api_not_found_error';
+        };
+    };
+    /**
+     * Default Response
+     */
+    409: {
+        error: {
+            message: string;
+            type: 'api_conflict_error';
+        };
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        error: {
+            message: string;
+            type: 'api_internal_server_error';
+        };
+    };
+};
+
+export type CreateScheduleTriggerFromConversationError = CreateScheduleTriggerFromConversationErrors[keyof CreateScheduleTriggerFromConversationErrors];
+
+export type CreateScheduleTriggerFromConversationResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        id: string;
+        organizationId: string;
+        name: string;
+        agentId: string;
+        messageTemplate: string;
+        cronExpression: string;
+        timezone: string;
+        enabled: boolean;
+        actorUserId: string;
+        lastExecutedAt: string | null;
+        createdAt: string;
+        linkedConversationId: string | null;
+        actor?: {
+            id: string;
+            name: string | null;
+            email: string | null;
+        } | null;
+        agent?: {
+            id: string;
+            name: string | null;
+            agentType: string | null;
+        } | null;
+    };
+};
+
+export type CreateScheduleTriggerFromConversationResponse = CreateScheduleTriggerFromConversationResponses[keyof CreateScheduleTriggerFromConversationResponses];
+
+export type GetConversationScheduleTriggerSuggestionData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/conversations/{id}/schedule-trigger-suggestion';
+};
+
+export type GetConversationScheduleTriggerSuggestionErrors = {
+    /**
+     * Default Response
+     */
+    400: {
+        error: {
+            message: string;
+            type: 'api_validation_error';
+        };
+    };
+    /**
+     * Default Response
+     */
+    401: {
+        error: {
+            message: string;
+            type: 'api_authentication_error';
+        };
+    };
+    /**
+     * Default Response
+     */
+    403: {
+        error: {
+            message: string;
+            type: 'api_authorization_error';
+        };
+    };
+    /**
+     * Default Response
+     */
+    404: {
+        error: {
+            message: string;
+            type: 'api_not_found_error';
+        };
+    };
+    /**
+     * Default Response
+     */
+    409: {
+        error: {
+            message: string;
+            type: 'api_conflict_error';
+        };
+    };
+    /**
+     * Default Response
+     */
+    500: {
+        error: {
+            message: string;
+            type: 'api_internal_server_error';
+        };
+    };
+};
+
+export type GetConversationScheduleTriggerSuggestionError = GetConversationScheduleTriggerSuggestionErrors[keyof GetConversationScheduleTriggerSuggestionErrors];
+
+export type GetConversationScheduleTriggerSuggestionResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        suggestedAgentId: string | null;
+        candidates: Array<{
+            agent: {
+                id: string;
+                name: string;
+                icon: string | null;
+            };
+            interactionCount: number;
+            lastUsedAt: string;
+        }>;
+        reason: 'explicit' | 'last-interaction' | 'current-conversation-agent' | 'member-default' | 'org-default' | 'none';
+        suggestedName: string;
+        suggestedMessageTemplatePreview: string;
+    };
+};
+
+export type GetConversationScheduleTriggerSuggestionResponse = GetConversationScheduleTriggerSuggestionResponses[keyof GetConversationScheduleTriggerSuggestionResponses];
 
 export type DeleteScheduleTriggerData = {
     body?: never;
@@ -37062,6 +37262,7 @@ export type GetScheduleTriggerResponses = {
         actorUserId: string;
         lastExecutedAt: string | null;
         createdAt: string;
+        linkedConversationId: string | null;
         actor?: {
             id: string;
             name: string | null;
@@ -37085,6 +37286,7 @@ export type UpdateScheduleTriggerData = {
         cronExpression?: string;
         timezone?: string;
         messageTemplate?: string;
+        linkedConversationId?: string | null;
     };
     path: {
         id: string;
@@ -37168,6 +37370,7 @@ export type UpdateScheduleTriggerResponses = {
         actorUserId: string;
         lastExecutedAt: string | null;
         createdAt: string;
+        linkedConversationId: string | null;
         actor?: {
             id: string;
             name: string | null;
@@ -37267,6 +37470,7 @@ export type EnableScheduleTriggerResponses = {
         actorUserId: string;
         lastExecutedAt: string | null;
         createdAt: string;
+        linkedConversationId: string | null;
         actor?: {
             id: string;
             name: string | null;
@@ -37366,6 +37570,7 @@ export type DisableScheduleTriggerResponses = {
         actorUserId: string;
         lastExecutedAt: string | null;
         createdAt: string;
+        linkedConversationId: string | null;
         actor?: {
             id: string;
             name: string | null;

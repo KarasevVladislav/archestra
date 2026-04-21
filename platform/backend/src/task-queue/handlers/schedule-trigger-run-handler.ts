@@ -9,6 +9,13 @@ import {
   UserModel,
 } from "@/models";
 import { metrics } from "@/observability";
+import { appendLinkedScheduleRunMessagesToConversation } from "@/schedule-triggers/append-linked-run-messages";
+import { scheduleTriggerConverterService } from "@/schedule-triggers/converter";
+import { resolvePlaceholders } from "@/schedule-triggers/resolve-placeholders";
+import websocketService from "@/websocket";
+
+const LINKED_CONVERSATION_AUTO_HEAL_WARNING =
+  "Linked chat agent changed; task was unlinked from the chat and will continue as standalone runs.";
 
 export async function handleScheduleTriggerRunExecution(
   payload: Record<string, unknown>,
@@ -83,15 +90,97 @@ export async function handleScheduleTriggerRunExecution(
       throw new Error("Scheduled trigger target must be an internal agent");
     }
 
-    await executeA2AMessage({
+    const linkedConversationId = trigger.linkedConversationId;
+    const sessionId =
+      linkedConversationId ?? `scheduled-${run.id}`;
+
+    const resolvedMessage = resolvePlaceholders(
+      trigger.messageTemplate,
+      trigger.timezone,
+    );
+
+    const result = await executeA2AMessage({
       agentId: trigger.agentId,
-      message: trigger.messageTemplate,
+      message: resolvedMessage,
       organizationId: trigger.organizationId,
       userId: actor.id,
-      sessionId: `scheduled-${run.id}`,
+      sessionId,
+      conversationId: linkedConversationId ?? undefined,
       source: "schedule-trigger",
       scheduleTriggerRunId: run.id,
     });
+
+    if (linkedConversationId) {
+      const linkedAgentValid =
+        await scheduleTriggerConverterService.isAgentValidForLinkedConversation(
+          {
+            linkedConversationId,
+            agentId: trigger.agentId,
+            actorUserId: actor.id,
+            organizationId: trigger.organizationId,
+          },
+        );
+
+      if (!linkedAgentValid) {
+        logger.warn(
+          {
+            runId: run.id,
+            triggerId: run.triggerId,
+            linkedConversationId,
+            agentId: trigger.agentId,
+          },
+          "Schedule trigger linked conversation no longer accepts the trigger agent; auto-healing by clearing linkedConversationId",
+        );
+
+        try {
+          await ScheduleTriggerModel.update(trigger.id, {
+            linkedConversationId: null,
+          });
+        } catch (healError) {
+          logger.error(
+            {
+              runId: run.id,
+              triggerId: run.triggerId,
+              error:
+                healError instanceof Error
+                  ? healError.message
+                  : String(healError),
+            },
+            "Failed to auto-heal schedule trigger linked conversation binding",
+          );
+        }
+
+        errorMessage = LINKED_CONVERSATION_AUTO_HEAL_WARNING;
+      } else {
+        try {
+          await appendLinkedScheduleRunMessagesToConversation({
+            conversationId: linkedConversationId,
+            messageTemplate: resolvedMessage,
+            assistantText: result.text,
+          });
+          await ScheduleTriggerRunModel.setChatConversationId(
+            run.id,
+            linkedConversationId,
+          );
+          await websocketService.notifyConversationMessagesUpdated({
+            conversationId: linkedConversationId,
+          });
+        } catch (syncError) {
+          logger.error(
+            {
+              runId: run.id,
+              triggerId: run.triggerId,
+              linkedConversationId,
+              error:
+                syncError instanceof Error
+                  ? syncError.message
+                  : String(syncError),
+            },
+            "Schedule trigger run succeeded but failed to sync messages to linked conversation",
+          );
+        }
+      }
+    }
   } catch (error) {
     status = "failed";
     errorMessage = formatScheduleTriggerExecutionError(
@@ -107,6 +196,13 @@ export async function handleScheduleTriggerRunExecution(
     runId: run.id,
     status,
     error: errorMessage,
+  });
+
+  websocketService.notifyScheduleTriggerRunUpdated({
+    organizationId: trigger.organizationId,
+    triggerId: run.triggerId,
+    runId: run.id,
+    notifyUserId: trigger.actorUserId,
   });
 
   metrics.scheduleTrigger.reportScheduleTriggerRun(agentName, status);

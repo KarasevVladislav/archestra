@@ -5,6 +5,8 @@ import {
   type ArchestraToolShortName,
   EXTERNAL_AGENT_ID_HEADER,
   getArchestraToolShortName,
+  getChatMessagesSyncSignature,
+  getServerMessagesToApplyToChat,
   isChatErrorResponse,
   makeSwapAgentPokeText,
   SWAP_AGENT_FAILED_POKE_TEXT,
@@ -32,7 +34,10 @@ import {
   useState,
 } from "react";
 import { filterOptimisticToolCalls } from "@/components/chat/chat-messages.utils";
-import { useGenerateConversationTitle } from "@/lib/chat/chat.query";
+import {
+  useConversation,
+  useGenerateConversationTitle,
+} from "@/lib/chat/chat.query";
 import { restoreRenderableAssistantParts } from "@/lib/chat/chat-session-utils";
 import { getChatExternalAgentId } from "@/lib/chat/chat-utils";
 import {
@@ -43,6 +48,7 @@ import {
 } from "@/lib/chat/swap-agent.utils";
 import appConfig from "@/lib/config/config";
 import { useAppName } from "@/lib/hooks/use-app-name";
+import { useWebSocketQueryInvalidation } from "@/lib/hooks/use-websocket-query-invalidation";
 
 const SESSION_CLEANUP_TIMEOUT = 10 * 60 * 1000; // 10 min
 const MAX_AUTO_RETRIES = 2;
@@ -312,6 +318,7 @@ function ChatSessionHook({
   notifySessionUpdate: () => void;
 }) {
   const queryClient = useQueryClient();
+  const { data: conversationFromQuery } = useConversation(conversationId);
   const appName = useAppName();
   const [pendingCustomServerToolCall, setPendingCustomServerToolCall] =
     useState<{ toolCallId: string; toolName: string } | null>(null);
@@ -341,11 +348,18 @@ function ChatSessionHook({
   const retryTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastUserMessageIdRef = useRef<string | null>(null);
   const previousMessagesRef = useRef<UIMessage[]>([]);
+  const lastAppliedServerSyncSignatureRef = useRef<string | null>(null);
 
   // Track early UI data from data-tool-ui-start events (toolCallId → resource data)
   const [earlyToolUiStarts, setEarlyToolUiStarts] = useState<
     ChatSession["earlyToolUiStarts"]
   >({});
+
+  useWebSocketQueryInvalidation(
+    "conversation_messages_updated",
+    [["conversation", conversationId]],
+    (msg) => msg.payload.conversationId === conversationId,
+  );
 
   const {
     messages,
@@ -537,6 +551,27 @@ function ChatSessionHook({
   sendMessageRef.current = sendMessage;
 
   const stableMessages = messagesWithRestoredAssistantParts;
+
+  useEffect(() => {
+    const serverMessages = (conversationFromQuery?.messages ??
+      []) as UIMessage[];
+    const serverSig = getChatMessagesSyncSignature(serverMessages);
+
+    const toApply = getServerMessagesToApplyToChat({
+      status,
+      clientMessages: messages,
+      serverMessages,
+      allowHardResyncOnReadyPrefixMismatch: true,
+    });
+    if (!toApply) {
+      return;
+    }
+    if (serverSig === lastAppliedServerSyncSignatureRef.current) {
+      return;
+    }
+    lastAppliedServerSyncSignatureRef.current = serverSig;
+    setMessages(toApply);
+  }, [conversationFromQuery?.messages, messages, setMessages, status]);
 
   // Reset retry counter only when the user sends a genuinely new message.
   // We track the last user message ID to avoid resetting during regenerate(),

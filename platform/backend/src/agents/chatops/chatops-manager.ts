@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { stripLlmReasoningTags } from "@shared";
 import { type A2AAttachment, executeA2AMessage } from "@/agents/a2a-executor";
 import { userHasPermission } from "@/auth/utils";
 import { type AllowedCacheKey, CacheKey, cacheManager } from "@/cache-manager";
@@ -1283,7 +1284,7 @@ export class ChatOpsManager {
         },
       });
 
-      const agentResponse = stripThinkingBlocks(result.text || "");
+      const agentResponse = stripLlmReasoningTags(result.text, ["thinking"]);
 
       if (sendReply && agentResponse) {
         await provider.sendReply({
@@ -1348,16 +1349,6 @@ async function getDefaultOrganizationId(): Promise<string> {
   }
   return org.id;
 }
-
-/**
- * Strip `<thinking>...</thinking>` blocks from LLM responses.
- * These are internal reasoning blocks that should not be shown to users.
- *
- * Uses non-greedy matching (`*?`) so multiple separate thinking blocks are
- * stripped independently without eating content between them. This assumes
- * blocks are not nested — nested `<thinking>` tags would leave the tail
- * visible, but LLMs do not produce nested thinking blocks in practice.
- */
 /**
  * Build a deterministic session ID for chatops messages.
  * Uses the thread ID when available (threaded conversations), otherwise
@@ -1385,10 +1376,6 @@ export function buildChatOpsSessionId(
 // Prometheus exemplar labels allow 128 UTF-8 chars total (keys + values).
 // traceID (7+32) + spanID (6+16) = 61; remaining for sessionID key (9) + value = 58.
 const MAX_SESSION_ID_LENGTH = 58;
-
-function stripThinkingBlocks(text: string): string {
-  return text.replace(/<thinking>[\s\S]*?<\/thinking>/gi, "").trim();
-}
 
 /**
  * Strip bot footer from message text to avoid the LLM repeating it.

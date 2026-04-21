@@ -38,6 +38,37 @@ export const ScheduleTriggerAgentSummarySchema = z.object({
   agentType: z.string().nullable(),
 });
 
+export const ScheduleTriggerSuggestionAgentCandidateSchema = z.object({
+  agent: z.object({
+    id: z.string(),
+    name: z.string(),
+    icon: z.string().nullable(),
+  }),
+  interactionCount: z.number().int().nonnegative(),
+  lastUsedAt: z.coerce.date(),
+});
+
+export const ScheduleTriggerSuggestionReasonSchema = z.enum([
+  "explicit",
+  "last-interaction",
+  "current-conversation-agent",
+  "member-default",
+  "org-default",
+  "none",
+]);
+
+export const ScheduleTriggerSuggestionSchema = z.object({
+  suggestedAgentId: z.string().nullable(),
+  candidates: z.array(ScheduleTriggerSuggestionAgentCandidateSchema),
+  reason: ScheduleTriggerSuggestionReasonSchema,
+  suggestedName: z.string(),
+  suggestedMessageTemplatePreview: z.string(),
+});
+
+export type ScheduleTriggerSuggestion = z.infer<
+  typeof ScheduleTriggerSuggestionSchema
+>;
+
 export const ScheduleTriggerConfigurationSchemaBase = z.object({
   cronExpression: z.string().min(1),
   timezone: z.string().min(1),

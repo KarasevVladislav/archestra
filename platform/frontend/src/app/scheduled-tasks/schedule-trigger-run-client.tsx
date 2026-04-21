@@ -36,10 +36,12 @@ import { useChatSession } from "@/lib/chat/global-chat.context";
 import { useLlmModels, useLlmModelsByProvider } from "@/lib/llm-models.query";
 import { useOrganization } from "@/lib/organization.query";
 import {
+  scheduleTriggerKeys,
   useCreateScheduleTriggerRunConversation,
   useScheduleTrigger,
   useScheduleTriggerRun,
 } from "@/lib/schedule-trigger.query";
+import { useWebSocketQueryInvalidation } from "@/lib/hooks/use-websocket-query-invalidation";
 import { cn } from "@/lib/utils";
 import { formatRelativeTimeFromNow } from "@/lib/utils/date-time";
 import { formatCronSchedule } from "@/lib/utils/format-cron";
@@ -95,7 +97,6 @@ export function ScheduleTriggerRunPage({
     triggerId,
     {
       enabled: !!triggerId,
-      refetchInterval: 5_000,
     },
   );
   const { data: run, isLoading: runLoading } = useScheduleTriggerRun(
@@ -103,8 +104,14 @@ export function ScheduleTriggerRunPage({
     runId,
     {
       enabled: !!triggerId && !!runId,
-      refetchInterval: 3_000,
     },
+  );
+
+  useWebSocketQueryInvalidation(
+    "schedule_trigger_run_updated",
+    [scheduleTriggerKeys.detail(triggerId), scheduleTriggerKeys.run(triggerId, runId)],
+    (msg) => msg.payload.triggerId === triggerId && msg.payload.runId === runId,
+    { enabled: !!triggerId && !!runId },
   );
   const ensureConversationMutation = useCreateScheduleTriggerRunConversation();
   const conversationId =

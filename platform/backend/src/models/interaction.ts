@@ -529,6 +529,43 @@ class InteractionModel {
   }
 
   /**
+   * Aggregate interactions by agent (`profile_id`) within a chat session.
+   */
+  static async listAgentUsageForSession(params: {
+    sessionId: string;
+    userId: string;
+    organizationId: string;
+  }): Promise<Array<{ agentId: string; count: number; lastUsedAt: Date }>> {
+    const rows = await db
+      .select({
+        agentId: schema.interactionsTable.profileId,
+        count: count(),
+        lastUsedAt: max(schema.interactionsTable.createdAt),
+      })
+      .from(schema.interactionsTable)
+      .where(
+        and(
+          eq(schema.interactionsTable.sessionId, params.sessionId),
+          eq(schema.interactionsTable.userId, params.userId),
+          isNotNull(schema.interactionsTable.profileId),
+        ),
+      )
+      .groupBy(schema.interactionsTable.profileId)
+      .orderBy(desc(max(schema.interactionsTable.createdAt)));
+
+    return rows
+      .filter(
+        (row): row is { agentId: string; count: number; lastUsedAt: Date } =>
+          row.agentId !== null && row.lastUsedAt !== null,
+      )
+      .map((row) => ({
+        agentId: row.agentId,
+        count: Number(row.count),
+        lastUsedAt: row.lastUsedAt,
+      }));
+  }
+
+  /**
    * Get all unique external agent IDs with display names
    * Used for filtering dropdowns in the UI
    * Returns agent info (id and displayName) for the dropdown to display names but filter by id

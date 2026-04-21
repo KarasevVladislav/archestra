@@ -21,21 +21,16 @@ import { useRouter, useSearchParams } from "next/navigation";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AgentIcon } from "@/components/agent-icon";
+import {
+  ScheduleTriggerFormDialog,
+  type ScheduleTriggerAgentOption,
+} from "@/components/scheduled-tasks/schedule-trigger-form-dialog";
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
 import { SearchInput } from "@/components/search-input";
 import { TableRowActions } from "@/components/table-row-actions";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
-import {
-  Dialog,
-  DialogBody,
-  DialogContent,
-  DialogForm,
-  DialogHeader,
-  DialogStickyFooter,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MultiSelect } from "@/components/ui/multi-select";
@@ -77,7 +72,6 @@ import { cn } from "@/lib/utils";
 import { formatRelativeTimeFromNow } from "@/lib/utils/date-time";
 import { formatCronSchedule } from "@/lib/utils/format-cron";
 import {
-  type AgentOption,
   buildScheduleTriggerPayload,
   DEFAULT_FORM_STATE,
   getActiveMutationVariable,
@@ -125,7 +119,6 @@ export function ScheduleTriggersIndexPage() {
       showOtherUsers && selectedAuthorIds.length > 0
         ? selectedAuthorIds
         : undefined,
-    refetchInterval: 5_000,
   });
   const { data: agents = [], isLoading: agentsLoading } = useProfiles({
     filters: { agentType: "agent" },
@@ -486,16 +479,20 @@ export function ScheduleTriggersIndexPage() {
             closeComposer();
           }
         }}
-        formState={formState}
+        title={editingTrigger !== null ? "Edit task" : "New task"}
+        values={formState}
         agentOptions={agentOptions}
         agentsLoading={agentsLoading}
         hasAgents={hasAgents}
         isSaving={isSaving}
         isFormValid={formPayload !== null}
-        isEditing={editingTrigger !== null}
         onSubmit={() => {
           void submitForm();
         }}
+        permissions={{
+          scheduledTask: [editingTrigger !== null ? "update" : "create"],
+        }}
+        submitLabel={editingTrigger !== null ? "Save changes" : "Create"}
         onNameChange={(name) => {
           nameTouchedRef.current = true;
           setFormState((current) => ({ ...current, name }));
@@ -590,9 +587,7 @@ export function ScheduleTriggerDetailPage({
     () => new Set(userTeams.map((t) => t.id)),
     [userTeams],
   );
-  const { data: trigger, isLoading } = useScheduleTrigger(triggerId, {
-    refetchInterval: 5_000,
-  });
+  const { data: trigger, isLoading } = useScheduleTrigger(triggerId);
   const { data: agents = [], isLoading: agentsLoading } = useProfiles({
     filters: { agentType: "agent" },
   });
@@ -888,6 +883,19 @@ export function ScheduleTriggerDetailPage({
         </DetailCard>
       </div>
 
+      {trigger.linkedConversationId ? (
+        <p className="text-sm text-muted-foreground">
+          Successful runs append messages to{" "}
+          <Link
+            href={`/chat/${trigger.linkedConversationId}`}
+            className="font-medium text-foreground underline-offset-4 hover:underline"
+          >
+            this conversation
+          </Link>
+          .
+        </p>
+      ) : null}
+
       {/* Runs table */}
       <h2 className="text-lg font-semibold">History</h2>
       <ScheduleTriggerRunsTable
@@ -908,16 +916,18 @@ export function ScheduleTriggerDetailPage({
             setEditDialogOpen(false);
           }
         }}
-        formState={formState}
+        title="Edit task"
+        values={formState}
         agentOptions={agentOptions}
         agentsLoading={agentsLoading}
         hasAgents={agents.length > 0}
         isSaving={isSaving}
         isFormValid={formPayload !== null}
-        isEditing
         onSubmit={() => {
           void submitForm();
         }}
+        permissions={{ scheduledTask: ["update"] }}
+        submitLabel="Save changes"
         onNameChange={(name) => {
           detailNameTouchedRef.current = true;
           setFormState((current) => ({ ...current, name }));
@@ -1089,312 +1099,6 @@ function ScheduleTriggerCreateButton({
       <Plus className="mr-2 h-4 w-4" />
       {children}
     </PermissionButton>
-  );
-}
-
-type ScheduleMode = "hourly" | "daily";
-
-const WEEKDAYS = [
-  { label: "Mon", value: 1 },
-  { label: "Tue", value: 2 },
-  { label: "Wed", value: 3 },
-  { label: "Thu", value: 4 },
-  { label: "Fri", value: 5 },
-  { label: "Sat", value: 6 },
-  { label: "Sun", value: 0 },
-] as const;
-
-const HOURS = Array.from({ length: 24 }, (_, i) => ({
-  value: String(i),
-  label: `${String(i).padStart(2, "0")}:00`,
-}));
-
-function parseCronToMode(cron: string): {
-  mode: ScheduleMode;
-  hour: string;
-  minute: string;
-  days: number[];
-} {
-  const parts = cron.trim().split(/\s+/);
-  const defaults = {
-    hour: "9",
-    minute: "0",
-    days: [1, 2, 3, 4, 5],
-  };
-
-  if (parts.length !== 5) {
-    return { mode: "daily", ...defaults };
-  }
-
-  const [min, hr, , , dow] = parts;
-
-  // Hourly: "0 * * * *" or "N * * * *"
-  if (hr === "*" && dow === "*") {
-    return { mode: "hourly", ...defaults };
-  }
-
-  // Daily: specific hour, days pattern
-  if (hr !== "*" && !hr.includes("/")) {
-    const dayList =
-      dow === "*"
-        ? [0, 1, 2, 3, 4, 5, 6]
-        : dow.split(",").flatMap((part) => {
-            if (part.includes("-")) {
-              const [start, end] = part.split("-").map(Number);
-              const result: number[] = [];
-              for (let i = start; i <= end; i++) result.push(i);
-              return result;
-            }
-            return [Number(part)];
-          });
-
-    return {
-      mode: "daily",
-      hour: hr,
-      minute: min,
-      days: dayList,
-    };
-  }
-
-  return { mode: "daily", ...defaults };
-}
-
-function buildCronFromSchedule(
-  mode: ScheduleMode,
-  hour: string,
-  minute: string,
-  days: number[],
-): string {
-  switch (mode) {
-    case "hourly":
-      return `${minute} * * * *`;
-    case "daily": {
-      const sorted = [...days].sort((a, b) => a - b);
-      const dowPart =
-        sorted.length === 7 || sorted.length === 0 ? "*" : sorted.join(",");
-      return `${minute} ${hour} * * ${dowPart}`;
-    }
-  }
-}
-
-function ScheduleSection({
-  cronExpression,
-  onCronExpressionChange,
-}: {
-  cronExpression: string;
-  onCronExpressionChange: (value: string) => void;
-}) {
-  const parsed = useMemo(
-    () => parseCronToMode(cronExpression),
-    [cronExpression],
-  );
-  const [mode, setMode] = useState<ScheduleMode>(parsed.mode);
-  const [hour, setHour] = useState(parsed.hour);
-  const [minute] = useState(parsed.minute);
-  const [days, setDays] = useState<number[]>(parsed.days);
-  const updateCron = useCallback(
-    (
-      newMode: ScheduleMode,
-      newHour: string,
-      newMinute: string,
-      newDays: number[],
-    ) => {
-      onCronExpressionChange(
-        buildCronFromSchedule(newMode, newHour, newMinute, newDays),
-      );
-    },
-    [onCronExpressionChange],
-  );
-
-  const handleModeChange = (newMode: ScheduleMode) => {
-    setMode(newMode);
-    updateCron(newMode, hour, minute, days);
-  };
-
-  const handleHourChange = (newHour: string) => {
-    setHour(newHour);
-    updateCron(mode, newHour, minute, days);
-  };
-
-  const handleDayToggle = (day: number) => {
-    const newDays = days.includes(day)
-      ? days.filter((d) => d !== day)
-      : [...days, day];
-    if (newDays.length === 0) return;
-    setDays(newDays);
-    updateCron(mode, hour, minute, newDays);
-  };
-
-  return (
-    <div className="space-y-3">
-      <Label>Schedule</Label>
-
-      <div className="flex gap-1 rounded-md border p-1">
-        {(["hourly", "daily"] as const).map((m) => (
-          <button
-            key={m}
-            type="button"
-            onClick={() => handleModeChange(m)}
-            className={cn(
-              "flex-1 rounded-sm px-2 py-1.5 text-xs font-medium capitalize transition-colors",
-              mode === m
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground",
-            )}
-          >
-            {m}
-          </button>
-        ))}
-      </div>
-
-      {mode === "daily" && (
-        <div className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-2">
-          <Label className="self-end">Repeat on</Label>
-          <Label className="self-end">Time</Label>
-          <div className="flex gap-1">
-            {WEEKDAYS.map((d) => (
-              <button
-                key={d.value}
-                type="button"
-                onClick={() => handleDayToggle(d.value)}
-                className={cn(
-                  "flex h-9 w-9 items-center justify-center rounded-md border text-xs font-medium transition-colors",
-                  days.includes(d.value)
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-input text-muted-foreground hover:bg-muted",
-                )}
-              >
-                {d.label}
-              </button>
-            ))}
-          </div>
-          <Select value={hour} onValueChange={handleHourChange}>
-            <SelectTrigger className="w-[90px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {HOURS.map((h) => (
-                <SelectItem key={h.value} value={h.value}>
-                  {h.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ScheduleTriggerFormDialog({
-  open,
-  onOpenChange,
-  formState,
-  agentOptions,
-  agentsLoading,
-  hasAgents,
-  isSaving,
-  isFormValid,
-  isEditing,
-  onSubmit,
-  onNameChange,
-  onAgentChange,
-  onCronExpressionChange,
-  onMessageTemplateChange,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  formState: ScheduleTriggerFormState;
-  agentOptions: AgentOption[];
-  agentsLoading: boolean;
-  hasAgents: boolean;
-  isSaving: boolean;
-  isFormValid: boolean;
-  isEditing: boolean;
-  onSubmit: () => void;
-  onNameChange: (value: string) => void;
-  onAgentChange: (value: string) => void;
-  onCronExpressionChange: (value: string) => void;
-  onMessageTemplateChange: (value: string) => void;
-}) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[85vh] flex flex-col overflow-hidden">
-        <DialogHeader>
-          <DialogTitle>{isEditing ? "Edit task" : "New task"}</DialogTitle>
-        </DialogHeader>
-
-        <DialogForm
-          className="flex min-h-0 flex-1 flex-col"
-          onSubmit={onSubmit}
-        >
-          <DialogBody className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="dialog-name">Name</Label>
-              <Input
-                id="dialog-name"
-                value={formState.name}
-                onChange={(event) => onNameChange(event.target.value)}
-                placeholder="e.g. Daily summary"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="dialog-agent">Agent</Label>
-              <SearchableSelect
-                value={formState.agentId}
-                onValueChange={onAgentChange}
-                items={agentOptions}
-                placeholder="Select agent"
-                searchPlaceholder="Search agents..."
-                disabled={agentsLoading || !hasAgents}
-                className="w-full"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="dialog-prompt">Task Prompt</Label>
-              <Textarea
-                id="dialog-prompt"
-                value={formState.messageTemplate}
-                onChange={(event) =>
-                  onMessageTemplateChange(event.target.value)
-                }
-                placeholder="Ask the agent to do something on every run."
-                className="min-h-[80px] resize-y"
-              />
-            </div>
-
-            <ScheduleSection
-              cronExpression={formState.cronExpression}
-              onCronExpressionChange={onCronExpressionChange}
-            />
-          </DialogBody>
-
-          <DialogStickyFooter className="mt-0">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
-              Cancel
-            </Button>
-            <PermissionButton
-              permissions={{
-                scheduledTask: [isEditing ? "update" : "create"],
-              }}
-              type="submit"
-              disabled={isSaving || !isFormValid}
-            >
-              {isSaving && (
-                <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-              )}
-              {isEditing ? "Save changes" : "Create"}
-            </PermissionButton>
-          </DialogStickyFooter>
-        </DialogForm>
-      </DialogContent>
-    </Dialog>
   );
 }
 

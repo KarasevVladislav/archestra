@@ -1,6 +1,7 @@
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import {
   TOOL_ARTIFACT_WRITE_SHORT_NAME,
+  TOOL_CONVERT_CONVERSATION_TO_SCHEDULED_TASK_SHORT_NAME,
   TOOL_SWAP_AGENT_SHORT_NAME,
   TOOL_SWAP_TO_DEFAULT_AGENT_SHORT_NAME,
   TOOL_TODO_WRITE_SHORT_NAME,
@@ -14,6 +15,8 @@ import {
   OrganizationModel,
   ScheduleTriggerRunModel,
 } from "@/models";
+import { scheduleTriggerConverterService } from "@/schedule-triggers/converter";
+import { ApiError } from "@/types";
 import { resolveConversationLlmSelectionForAgent } from "@/utils/llm-resolution";
 import {
   catchError,
@@ -61,6 +64,23 @@ const ArtifactWriteOutputSchema = z.object({
     .int()
     .nonnegative()
     .describe("The number of characters written to the artifact."),
+});
+
+const ConvertConversationToScheduledTaskOutputSchema = z.object({
+  success: z.literal(true).describe("Whether the conversion succeeded."),
+  trigger_id: z
+    .string()
+    .describe("The ID of the created scheduled task (trigger)."),
+  agent_id: z
+    .string()
+    .describe(
+      "The ID of the agent that was selected for the scheduled task.",
+    ),
+  name: z.string().describe("The name of the created scheduled task."),
+  cron_expression: z
+    .string()
+    .describe("The cron expression stored for the scheduled task."),
+  timezone: z.string().describe("The IANA timezone for the schedule."),
 });
 
 const registry = defineArchestraTools([
@@ -205,6 +225,73 @@ const registry = defineArchestraTools([
       } catch (error) {
         return catchError(error, "writing artifact");
       }
+    },
+  }),
+  defineArchestraTool({
+    shortName: TOOL_CONVERT_CONVERSATION_TO_SCHEDULED_TASK_SHORT_NAME,
+    title: "Convert Conversation to Scheduled Task",
+    description:
+      "Create a recurring scheduled task from the current conversation. The task will replay a standalone prompt (summarized from this chat unless one is provided) on the supplied cron schedule using an agent selected from this conversation's history. " +
+      "Use this when the user explicitly asks to save, schedule, or re-run the current task periodically (e.g. 'do this every Monday at 9am', 'turn this into a recurring task'). " +
+      "Prefer omitting agent_name and message_template to reuse the current conversation's context. Provide message_template only when the user wants to rewrite the prompt, and provide agent_name only when they pick a different agent. " +
+      "Timezone must be a valid IANA identifier (e.g. 'UTC', 'Europe/London'). Cron expression uses standard 5-field syntax.",
+    schema: z
+      .object({
+        cron_expression: z
+          .string()
+          .trim()
+          .min(1)
+          .describe(
+            "Standard 5-field cron expression (minute hour day month weekday), e.g. '0 9 * * 1'.",
+          ),
+        timezone: z
+          .string()
+          .trim()
+          .min(1)
+          .describe(
+            "IANA timezone identifier for the schedule, e.g. 'UTC' or 'Europe/London'.",
+          ),
+        name: z
+          .string()
+          .trim()
+          .min(1)
+          .optional()
+          .describe(
+            "Optional human-readable name for the scheduled task. Defaults to the conversation title or a snippet of the first user message.",
+          ),
+        message_template: z
+          .string()
+          .trim()
+          .min(1)
+          .optional()
+          .describe(
+            "Optional standalone prompt to run on every schedule tick. When omitted, the conversation is summarized into a prompt automatically.",
+          ),
+        agent_name: z
+          .string()
+          .trim()
+          .min(1)
+          .optional()
+          .describe(
+            "Optional exact agent name to run the scheduled task. When omitted, the most recently used agent in this conversation is selected. When reply_in_same_conversation is true, this must be the current chat agent or one that has previously participated in the conversation.",
+          ),
+        enabled: z
+          .boolean()
+          .optional()
+          .describe(
+            "Whether the scheduled task should start enabled. Defaults to true.",
+          ),
+        reply_in_same_conversation: z
+          .boolean()
+          .optional()
+          .describe(
+            "When true, each successful run appends the prompt and assistant reply to this conversation instead of an isolated run thread. If the conversation's agent later changes (e.g. swap_agent) and the scheduled task's agent is no longer valid for the chat, the task auto-unlinks from the conversation and continues as standalone runs.",
+          ),
+      })
+      .strict(),
+    outputSchema: ConvertConversationToScheduledTaskOutputSchema,
+    async handler({ args, context }) {
+      return handleConvertConversationToScheduledTask({ args, context });
     },
   }),
 ] as const);
@@ -392,5 +479,103 @@ async function handleSwapToDefaultAgent(params: {
     );
   } catch (error) {
     return catchError(error, "swapping to default agent");
+  }
+}
+
+async function handleConvertConversationToScheduledTask(params: {
+  args: {
+    cron_expression: string;
+    timezone: string;
+    name?: string;
+    message_template?: string;
+    agent_name?: string;
+    enabled?: boolean;
+    reply_in_same_conversation?: boolean;
+  };
+  context: ArchestraContext;
+}): Promise<CallToolResult> {
+  const { args, context } = params;
+
+  try {
+    if (
+      !context.conversationId ||
+      !context.userId ||
+      !context.organizationId
+    ) {
+      return errorResult(
+        "This tool requires conversation context. It can only be used within an active chat conversation.",
+      );
+    }
+
+    if (context.scheduleTriggerRunId) {
+      return errorResult(
+        "Scheduled task runs cannot be converted into new scheduled tasks.",
+      );
+    }
+
+    let resolvedAgentId: string | undefined;
+    if (args.agent_name) {
+      const isAdmin = await isAgentTypeAdmin({
+        userId: context.userId,
+        organizationId: context.organizationId,
+        agentType: "agent",
+      });
+
+      const results = await AgentModel.findAllPaginated(
+        { limit: 5, offset: 0 },
+        undefined,
+        {
+          name: args.agent_name,
+          agentType: "agent",
+          excludeOtherPersonalAgents: true,
+        },
+        context.userId,
+        isAdmin,
+      );
+
+      if (results.data.length === 0) {
+        return errorResult(
+          `No agent found matching "${args.agent_name}".`,
+        );
+      }
+
+      const targetAgent =
+        results.data.find(
+          (a) => a.name.toLowerCase() === args.agent_name!.toLowerCase(),
+        ) ?? results.data[0];
+
+      resolvedAgentId = targetAgent.id;
+    }
+
+    const trigger =
+      await scheduleTriggerConverterService.createFromConversation({
+        conversationId: context.conversationId,
+        userId: context.userId,
+        organizationId: context.organizationId,
+        cronExpression: args.cron_expression,
+        timezone: args.timezone,
+        name: args.name,
+        messageTemplate: args.message_template,
+        agentId: resolvedAgentId,
+        enabled: args.enabled,
+        replyInSameConversation: args.reply_in_same_conversation,
+      });
+
+    return structuredSuccessResult(
+      {
+        success: true,
+        trigger_id: trigger.id,
+        agent_id: trigger.agentId,
+        name: trigger.name,
+        cron_expression: trigger.cronExpression,
+        timezone: trigger.timezone,
+      },
+      `Created scheduled task "${trigger.name}" (${trigger.cronExpression} ${trigger.timezone}, agent ${trigger.agentId}).`,
+    );
+  } catch (error) {
+    if (error instanceof ApiError) {
+      return errorResult(error.message);
+    }
+    return catchError(error, "converting conversation to scheduled task");
   }
 }

@@ -1,5 +1,6 @@
 import {
   and,
+  asc,
   desc,
   eq,
   getTableColumns,
@@ -300,7 +301,11 @@ class ConversationModel {
           eq(schema.conversationsTable.organizationId, organizationId),
         ),
       )
-      .orderBy(schema.messagesTable.createdAt);
+      // Can be same createdAt if messages are created via scheduled task.
+      .orderBy(
+        asc(schema.messagesTable.createdAt),
+        asc(schema.messagesTable.id),
+      );
 
     if (rows.length === 0) {
       return null;
@@ -484,7 +489,10 @@ class ConversationModel {
           eq(schema.conversationsTable.organizationId, params.organizationId),
         ),
       )
-      .orderBy(schema.messagesTable.createdAt);
+      .orderBy(
+        asc(schema.messagesTable.createdAt),
+        asc(schema.messagesTable.id),
+      );
 
     if (rows.length === 0) {
       return null;

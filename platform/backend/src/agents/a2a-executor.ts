@@ -105,8 +105,15 @@ export async function executeA2AMessage(
   // Generate isolation key for browser tab isolation.
   // When called from chat delegation, conversationId is provided.
   // When called directly (A2A route), generate a unique execution ID.
+  // For scheduled runs that target an existing conversation, namespace the
+  // key with the run id so parallel scheduled runs don't collide with each
+  // other or with a concurrently-open user chat on the same conversation.
   const isDirectExecutionOutsideConversation = !params.conversationId;
-  const isolationKey = params.conversationId ?? crypto.randomUUID();
+  const isolationKey = params.conversationId
+    ? params.scheduleTriggerRunId
+      ? `${params.conversationId}:run:${params.scheduleTriggerRunId}`
+      : params.conversationId
+    : crypto.randomUUID();
 
   // Build delegation chain: append current agentId to parent chain
   const delegationChain = parentDelegationChain

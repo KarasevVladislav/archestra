@@ -1,4 +1,5 @@
 import { archestraApiSdk, type PaginationMeta } from "@shared";
+import type { GetConversationScheduleTriggerSuggestionResponse } from "@shared/hey-api/clients/api/types.gen";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { handleApiError } from "./utils";
@@ -15,7 +16,18 @@ const {
   getScheduleTriggerRuns,
   getScheduleTriggerRun,
   createScheduleTriggerRunConversation,
+  createScheduleTriggerFromConversation,
+  getConversationScheduleTriggerSuggestion,
 } = archestraApiSdk;
+
+const EMPTY_PAGINATION: PaginationMeta = {
+  currentPage: 1,
+  limit: 50,
+  total: 0,
+  totalPages: 0,
+  hasNext: false,
+  hasPrev: false,
+};
 
 export type ScheduleTriggerRunStatus = "running" | "success" | "failed";
 
@@ -33,6 +45,7 @@ export type ScheduleTrigger = {
   actorUserId: string;
   lastExecutedAt: string | null;
   createdAt: string;
+  linkedConversationId: string | null;
   actor?: {
     id: string;
     name: string | null;
@@ -468,13 +481,70 @@ export function useRunScheduleTriggerNow() {
   });
 }
 
-// --- Internal constants ---
+export type ScheduleTriggerSuggestion =
+  GetConversationScheduleTriggerSuggestionResponse;
 
-const EMPTY_PAGINATION: PaginationMeta = {
-  currentPage: 1,
-  limit: 50,
-  total: 0,
-  totalPages: 0,
-  hasNext: false,
-  hasPrev: false,
+export type ScheduleTriggerSuggestionReason =
+  ScheduleTriggerSuggestion["reason"];
+
+export type ScheduleTriggerSuggestionCandidate =
+  ScheduleTriggerSuggestion["candidates"][number];
+
+export type CreateScheduleTriggerFromConversationInput = {
+  conversationId: string;
+  cronExpression: string;
+  timezone: string;
+  name?: string;
+  messageTemplate?: string;
+  agentId?: string;
+  enabled?: boolean;
+  replyInSameConversation?: boolean;
 };
+
+export const conversationScheduleTriggerKeys = {
+  suggestion: (conversationId: string) =>
+    [...scheduleTriggerKeys.all, "conversation-suggestion", conversationId] as const,
+};
+
+export function useConversationScheduleTriggerSuggestion(
+  conversationId: string | null,
+  params?: { enabled?: boolean },
+) {
+  return useQuery({
+    queryKey: conversationScheduleTriggerKeys.suggestion(conversationId ?? ""),
+    queryFn: async () => {
+      const response = await getConversationScheduleTriggerSuggestion({
+        path: { id: conversationId as string },
+      });
+      if (response.error) {
+        handleApiError(response.error);
+        return null;
+      }
+      return (response.data as ScheduleTriggerSuggestion | undefined) ?? null;
+    },
+    enabled: !!conversationId && (params?.enabled ?? true),
+  });
+}
+
+export function useCreateScheduleTriggerFromConversation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: CreateScheduleTriggerFromConversationInput) => {
+      const response = await createScheduleTriggerFromConversation({
+        body: input,
+      });
+      if (response.error) {
+        handleApiError(response.error);
+        return null;
+      }
+      return (response.data as ScheduleTrigger | undefined) ?? null;
+    },
+    onSuccess: (data) => {
+      if (!data) return;
+      toast.success("Scheduled task created");
+      queryClient.invalidateQueries({ queryKey: scheduleTriggerKeys.all });
+    },
+  });
+}
+

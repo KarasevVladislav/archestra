@@ -7,6 +7,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import agentsTable from "./agent";
+import conversationsTable from "./conversation";
 import usersTable from "./user";
 
 const scheduleTriggersTable = pgTable(
@@ -32,8 +33,15 @@ const scheduleTriggersTable = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
       .notNull()
       .defaultNow(),
+    linkedConversationId: uuid("linked_conversation_id").references(
+      () => conversationsTable.id,
+      { onDelete: "set null" },
+    ),
   },
   (table) => [
+    index("schedule_triggers_linked_conversation_id_idx").on(
+      table.linkedConversationId,
+    ),
     index("schedule_triggers_agent_id_idx").on(table.agentId),
     index("schedule_triggers_actor_user_id_idx").on(table.actorUserId),
     index("schedule_triggers_enabled_last_executed_at_idx").on(

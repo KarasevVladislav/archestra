@@ -21,6 +21,7 @@ import {
   ScheduleTriggerRunModel,
 } from "@/models";
 import { taskQueueService } from "@/task-queue";
+import { scheduleTriggerConverterService } from "@/schedule-triggers/converter";
 import {
   ApiError,
   constructResponseSchema,
@@ -28,6 +29,7 @@ import {
   ScheduleTriggerConfigurationSchema,
   ScheduleTriggerConfigurationSchemaBase,
   ScheduleTriggerRunStatusSchema,
+  ScheduleTriggerSuggestionSchema,
   SelectConversationSchema,
   SelectScheduleTriggerRunSchema,
   SelectScheduleTriggerSchema,
@@ -58,8 +60,23 @@ const CreateScheduleTriggerBodySchema =
     }
   });
 
+const CreateScheduleTriggerFromConversationBodySchema = z.object({
+  conversationId: UuidIdSchema,
+  cronExpression: z.string().min(1),
+  timezone: z.string().min(1),
+  name: z.string().min(1).optional(),
+  messageTemplate: z.string().min(1).optional(),
+  agentId: UuidIdSchema.optional(),
+  enabled: z.boolean().optional(),
+  replyInSameConversation: z.boolean().optional(),
+});
+
 const UpdateScheduleTriggerBodySchema =
-  ScheduleTriggerBodyFieldsSchema.partial().superRefine((data, ctx) => {
+  ScheduleTriggerBodyFieldsSchema.partial()
+    .extend({
+      linkedConversationId: z.union([UuidIdSchema, z.null()]).optional(),
+    })
+    .superRefine((data, ctx) => {
     if (Object.keys(data).length === 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -240,6 +257,60 @@ const scheduleTriggerRoutes: FastifyPluginAsyncZod = async (fastify) => {
     },
   );
 
+  fastify.post(
+    "/api/schedule-triggers/from-conversation",
+    {
+      schema: {
+        operationId: RouteId.CreateScheduleTriggerFromConversation,
+        description:
+          "Create a scheduled agent trigger from an existing conversation. If messageTemplate is omitted, the conversation is summarized into a standalone prompt. If agentId is omitted, the most recently used agent for that conversation is selected.",
+        tags: ["Schedule Triggers"],
+        body: CreateScheduleTriggerFromConversationBodySchema,
+        response: constructResponseSchema(SelectScheduleTriggerSchema),
+      },
+    },
+    async ({ body, user, organizationId }, reply) => {
+      const trigger = await scheduleTriggerConverterService.createFromConversation({
+        conversationId: body.conversationId,
+        userId: user.id,
+        organizationId,
+        cronExpression: body.cronExpression,
+        timezone: body.timezone,
+        name: body.name,
+        messageTemplate: body.messageTemplate,
+        agentId: body.agentId,
+        enabled: body.enabled,
+        replyInSameConversation: body.replyInSameConversation,
+      });
+
+      return reply.send(trigger);
+    },
+  );
+
+  fastify.get(
+    "/api/conversations/:id/schedule-trigger-suggestion",
+    {
+      schema: {
+        operationId: RouteId.GetConversationScheduleTriggerSuggestion,
+        description:
+          "Suggest defaults (agent, name, prompt preview) for converting a conversation into a scheduled task.",
+        tags: ["Schedule Triggers"],
+        params: z.object({ id: UuidIdSchema }),
+        response: constructResponseSchema(ScheduleTriggerSuggestionSchema),
+      },
+    },
+    async ({ params: { id }, user, organizationId }, reply) => {
+      const suggestion =
+        await scheduleTriggerConverterService.suggestForConversation({
+          conversationId: id,
+          userId: user.id,
+          organizationId,
+        });
+
+      return reply.send(suggestion);
+    },
+  );
+
   fastify.get(
     "/api/schedule-triggers/:id",
     {
@@ -335,6 +406,33 @@ const scheduleTriggerRoutes: FastifyPluginAsyncZod = async (fastify) => {
           400,
           firstIssue?.message ?? "Invalid schedule trigger configuration",
         );
+      }
+
+      const effectiveLinkedConversationId =
+        body.linkedConversationId !== undefined
+          ? body.linkedConversationId
+          : existing.linkedConversationId;
+      const effectiveAgentId = body.agentId ?? existing.agentId;
+
+      if (effectiveLinkedConversationId) {
+        try {
+          await scheduleTriggerConverterService.assertValidLinkedConversationBinding(
+            {
+              linkedConversationId: effectiveLinkedConversationId,
+              agentId: effectiveAgentId,
+              actorUserId: existing.actorUserId,
+              organizationId,
+            },
+          );
+        } catch (err) {
+          if (err instanceof ApiError && err.statusCode === 404) {
+            throw new ApiError(
+              400,
+              "Linked conversation is no longer accessible. Choose a different conversation or clear the binding.",
+            );
+          }
+          throw err;
+        }
       }
 
       const updated = await ScheduleTriggerModel.update(id, body);

@@ -1,4 +1,7 @@
-import type { SupportedProvider } from "@shared";
+import {
+  SupportedProvidersSchema,
+  type SupportedProvider,
+} from "@shared";
 import { and, eq, ilike, notInArray, or, sql } from "drizzle-orm";
 import db, { schema } from "@/database";
 import logger from "@/logging";
@@ -524,6 +527,24 @@ class ModelModel {
       .limit(1);
 
     return result || null;
+  }
+
+  /**
+   * All distinct providers that have a row for this Archestra `modelId`, ordered
+   * by the global supported-provider enum (stable disambiguation).
+   */
+  static async findProvidersByModelId(
+    modelId: string,
+  ): Promise<SupportedProvider[]> {
+    const rows = await db
+      .selectDistinct({ provider: schema.modelsTable.provider })
+      .from(schema.modelsTable)
+      .where(eq(schema.modelsTable.modelId, modelId));
+
+    const seen = new Set(rows.map((row) => row.provider));
+    return SupportedProvidersSchema.options.filter((provider) =>
+      seen.has(provider),
+    );
   }
 
   /**

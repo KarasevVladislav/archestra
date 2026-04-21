@@ -11,14 +11,31 @@ const mockUserHasAgentAccess = vi.hoisted(() =>
 const mockHasAnyAgentTypeAdminPermission = vi.hoisted(() =>
   vi.fn().mockResolvedValue({ success: false }),
 );
+const mockMessageBulkCreate = vi.hoisted(() =>
+  vi.fn().mockResolvedValue(undefined),
+);
+const mockSetChatConversationId = vi.hoisted(() =>
+  vi.fn().mockResolvedValue(undefined),
+);
+const mockAppendLinkedScheduleRunMessagesToConversation = vi.hoisted(() =>
+  vi.fn().mockResolvedValue(undefined),
+);
+const mockTriggerUpdate = vi.hoisted(() =>
+  vi.fn().mockResolvedValue(undefined),
+);
+const mockIsAgentValidForLinkedConversation = vi.hoisted(() =>
+  vi.fn().mockResolvedValue(true),
+);
 
 vi.mock("@/models", () => ({
   ScheduleTriggerRunModel: {
     findById: mockRunFindById,
     markCompleted: mockRunMarkCompleted,
+    setChatConversationId: mockSetChatConversationId,
   },
   ScheduleTriggerModel: {
     findById: mockTriggerFindById,
+    update: mockTriggerUpdate,
   },
   UserModel: {
     getById: mockUserGetById,
@@ -29,10 +46,24 @@ vi.mock("@/models", () => ({
   AgentTeamModel: {
     userHasAgentAccess: mockUserHasAgentAccess,
   },
+  MessageModel: {
+    bulkCreate: mockMessageBulkCreate,
+  },
 }));
 
 vi.mock("@/auth", () => ({
   hasAnyAgentTypeAdminPermission: mockHasAnyAgentTypeAdminPermission,
+}));
+
+vi.mock("@/schedule-triggers/append-linked-run-messages", () => ({
+  appendLinkedScheduleRunMessagesToConversation:
+    mockAppendLinkedScheduleRunMessagesToConversation,
+}));
+
+vi.mock("@/schedule-triggers/converter", () => ({
+  scheduleTriggerConverterService: {
+    isAgentValidForLinkedConversation: mockIsAgentValidForLinkedConversation,
+  },
 }));
 
 const mockExecuteA2AMessage = vi.hoisted(() =>
@@ -51,6 +82,18 @@ vi.mock("@/logging", () => ({
   },
 }));
 
+const mockNotifyConversationMessagesUpdated = vi.hoisted(() =>
+  vi.fn(),
+);
+const mockNotifyScheduleTriggerRunUpdated = vi.hoisted(() => vi.fn());
+vi.mock("@/websocket", () => ({
+  default: {
+    notifyConversationMessagesUpdated: mockNotifyConversationMessagesUpdated,
+    notifyScheduleTriggerRunUpdated: mockNotifyScheduleTriggerRunUpdated,
+  },
+}));
+
+import logger from "@/logging";
 import { handleScheduleTriggerRunExecution } from "./schedule-trigger-run-handler";
 
 const makeRun = (overrides = {}) => ({
@@ -111,6 +154,15 @@ describe("handleScheduleTriggerRunExecution", () => {
       messageId: "msg-1",
       text: "done",
     });
+    mockMessageBulkCreate.mockResolvedValue(undefined);
+    mockSetChatConversationId.mockResolvedValue(undefined);
+    mockAppendLinkedScheduleRunMessagesToConversation.mockResolvedValue(
+      undefined,
+    );
+    mockTriggerUpdate.mockResolvedValue(undefined);
+    mockIsAgentValidForLinkedConversation.mockResolvedValue(true);
+    mockNotifyConversationMessagesUpdated.mockClear();
+    vi.mocked(logger.error).mockClear();
   });
 
   test("executes A2A message and marks run as success", async () => {
@@ -140,6 +192,90 @@ describe("handleScheduleTriggerRunExecution", () => {
       status: "success",
       error: null,
     });
+    expect(mockMessageBulkCreate).not.toHaveBeenCalled();
+    expect(mockSetChatConversationId).not.toHaveBeenCalled();
+    expect(mockNotifyConversationMessagesUpdated).not.toHaveBeenCalled();
+  });
+
+  test("uses linked conversation session and persists messages when configured", async () => {
+    const linkedId = "00000000-0000-4000-8000-000000000001";
+    mockRunFindById.mockResolvedValue(makeRun());
+    mockTriggerFindById.mockResolvedValue(
+      makeTrigger({ linkedConversationId: linkedId }),
+    );
+    mockUserGetById.mockResolvedValue(makeUser());
+    mockAgentFindById.mockResolvedValue(makeAgent());
+    mockUserHasAgentAccess.mockResolvedValue(true);
+
+    await handleScheduleTriggerRunExecution({
+      runId: "run-1",
+      triggerId: "trigger-1",
+    });
+
+    expect(mockExecuteA2AMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: linkedId,
+        conversationId: linkedId,
+        agentId: "agent-1",
+        userId: "user-1",
+        source: "schedule-trigger",
+      }),
+    );
+    expect(mockAppendLinkedScheduleRunMessagesToConversation).toHaveBeenCalledWith(
+      {
+        conversationId: linkedId,
+        messageTemplate: "Run the task",
+        assistantText: "done",
+      },
+    );
+    expect(mockSetChatConversationId).toHaveBeenCalledWith("run-1", linkedId);
+    expect(mockNotifyConversationMessagesUpdated).toHaveBeenCalledWith({
+      conversationId: linkedId,
+      organizationId: "org-1",
+      ownerUserId: "user-1",
+    });
+    expect(mockRunMarkCompleted).toHaveBeenCalledWith({
+      runId: "run-1",
+      status: "success",
+      error: null,
+    });
+  });
+
+  test("marks run success when linked conversation sync fails after successful execution", async () => {
+    const linkedId = "00000000-0000-4000-8000-000000000002";
+    mockRunFindById.mockResolvedValue(makeRun());
+    mockTriggerFindById.mockResolvedValue(
+      makeTrigger({ linkedConversationId: linkedId }),
+    );
+    mockUserGetById.mockResolvedValue(makeUser());
+    mockAgentFindById.mockResolvedValue(makeAgent());
+    mockUserHasAgentAccess.mockResolvedValue(true);
+    mockAppendLinkedScheduleRunMessagesToConversation.mockRejectedValue(
+      new Error("db write failed"),
+    );
+
+    await handleScheduleTriggerRunExecution({
+      runId: "run-1",
+      triggerId: "trigger-1",
+    });
+
+    expect(mockExecuteA2AMessage).toHaveBeenCalled();
+    expect(mockRunMarkCompleted).toHaveBeenCalledWith({
+      runId: "run-1",
+      status: "success",
+      error: null,
+    });
+    expect(mockNotifyConversationMessagesUpdated).not.toHaveBeenCalled();
+    expect(mockSetChatConversationId).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runId: "run-1",
+        triggerId: "trigger-1",
+        linkedConversationId: linkedId,
+        error: "db write failed",
+      }),
+      "Schedule trigger run succeeded but failed to sync messages to linked conversation",
+    );
   });
 
   test("marks run as failed when trigger no longer exists", async () => {
@@ -232,5 +368,68 @@ describe("handleScheduleTriggerRunExecution", () => {
     await expect(
       handleScheduleTriggerRunExecution({ triggerId: "trigger-1" }),
     ).rejects.toThrow("Missing runId");
+  });
+
+  test("auto-heals when linked conversation no longer accepts the trigger agent (post-swap)", async () => {
+    const linkedId = "00000000-0000-4000-8000-000000000099";
+    mockRunFindById.mockResolvedValue(makeRun());
+    mockTriggerFindById.mockResolvedValue(
+      makeTrigger({ linkedConversationId: linkedId }),
+    );
+    mockUserGetById.mockResolvedValue(makeUser());
+    mockAgentFindById.mockResolvedValue(makeAgent());
+    mockUserHasAgentAccess.mockResolvedValue(true);
+    mockIsAgentValidForLinkedConversation.mockResolvedValue(false);
+
+    await handleScheduleTriggerRunExecution({
+      runId: "run-1",
+      triggerId: "trigger-1",
+    });
+
+    expect(mockExecuteA2AMessage).toHaveBeenCalled();
+    expect(mockAppendLinkedScheduleRunMessagesToConversation).not.toHaveBeenCalled();
+    expect(mockSetChatConversationId).not.toHaveBeenCalled();
+    expect(mockNotifyConversationMessagesUpdated).not.toHaveBeenCalled();
+    expect(mockTriggerUpdate).toHaveBeenCalledWith("trigger-1", {
+      linkedConversationId: null,
+    });
+    expect(mockRunMarkCompleted).toHaveBeenCalledWith({
+      runId: "run-1",
+      status: "success",
+      error: expect.stringContaining("unlinked from the chat"),
+    });
+  });
+
+  test("still marks run success even if auto-heal DB update fails", async () => {
+    const linkedId = "00000000-0000-4000-8000-0000000000aa";
+    mockRunFindById.mockResolvedValue(makeRun());
+    mockTriggerFindById.mockResolvedValue(
+      makeTrigger({ linkedConversationId: linkedId }),
+    );
+    mockUserGetById.mockResolvedValue(makeUser());
+    mockAgentFindById.mockResolvedValue(makeAgent());
+    mockUserHasAgentAccess.mockResolvedValue(true);
+    mockIsAgentValidForLinkedConversation.mockResolvedValue(false);
+    mockTriggerUpdate.mockRejectedValue(new Error("db down"));
+
+    await handleScheduleTriggerRunExecution({
+      runId: "run-1",
+      triggerId: "trigger-1",
+    });
+
+    expect(mockAppendLinkedScheduleRunMessagesToConversation).not.toHaveBeenCalled();
+    expect(mockRunMarkCompleted).toHaveBeenCalledWith({
+      runId: "run-1",
+      status: "success",
+      error: expect.stringContaining("unlinked from the chat"),
+    });
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runId: "run-1",
+        triggerId: "trigger-1",
+        error: "db down",
+      }),
+      "Failed to auto-heal schedule trigger linked conversation binding",
+    );
   });
 });

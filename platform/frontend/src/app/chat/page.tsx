@@ -6,6 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
   Bot,
+  CalendarClock,
   CornerDownLeftIcon,
   FileText,
   Globe,
@@ -40,6 +41,7 @@ import { BrowserPanel } from "@/components/chat/browser-panel";
 import { ChatLinkButton } from "@/components/chat/chat-help-link";
 import { ChatMessages } from "@/components/chat/chat-messages";
 import { ConversationArtifactPanel } from "@/components/chat/conversation-artifact";
+import { ConvertToScheduledTaskDialog } from "@/components/chat/convert-to-scheduled-task-dialog";
 import { InitialAgentSelector } from "@/components/chat/initial-agent-selector";
 import {
   PlaywrightInstallDialog,
@@ -56,6 +58,7 @@ import MessageThread, {
 } from "@/components/message-thread";
 import { StandardDialog } from "@/components/standard-dialog";
 import { Button } from "@/components/ui/button";
+import { useWebSocketQueryInvalidation } from "@/lib/hooks/use-websocket-query-invalidation";
 import {
   Card,
   CardContent,
@@ -178,6 +181,8 @@ export function ChatPageContent({
   >(undefined);
 
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+  const [isConvertToTaskDialogOpen, setIsConvertToTaskDialogOpen] =
+    useState(false);
   const [isForkDialogOpen, setIsForkDialogOpen] = useState(false);
   const [forkAgentId, setForkAgentId] = useState<string | null>(null);
   const forkSharedConversationMutation = useForkSharedConversation();
@@ -204,6 +209,9 @@ export function ChatPageContent({
   });
   const { data: canReadLlmProvider } = useHasPermissions({
     llmProviderApiKey: ["read"],
+  });
+  const { data: canCreateScheduledTask } = useHasPermissions({
+    scheduledTask: ["create"],
   });
   const { data: canReadLlmModels } = useHasPermissions({
     llmModel: ["read"],
@@ -526,14 +534,26 @@ export function ChatPageContent({
     [router],
   );
 
-  // Fetch conversation with messages
   const { data: conversation, isLoading: isLoadingConversation } =
     useConversation(conversationId);
+
+  useWebSocketQueryInvalidation(
+    "conversation_messages_updated",
+    conversationId ? [["conversation", conversationId]] : [],
+    (msg) => msg.payload.conversationId === conversationId,
+    { enabled: !!conversationId },
+  );
   const canManageShare =
     !!conversationId &&
     !!conversation &&
     conversation.userId === session?.user.id;
   useConversationShare(canManageShare ? conversationId : undefined);
+  const canConvertToTask =
+    !!conversationId &&
+    !!conversation &&
+    !!canCreateScheduledTask &&
+    conversation.userId === session?.user.id &&
+    (conversation.messages?.length ?? 0) > 0;
   const isShared = !!conversation?.share;
   const isReadOnlySharedConversation =
     !!conversationId &&
@@ -1577,6 +1597,21 @@ export function ChatPageContent({
                   </Button>
                 )}
                 {canManageShare && <div className="w-px h-4 bg-border" />}
+                {canConvertToTask && (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsConvertToTaskDialogOpen(true)}
+                      className="text-xs"
+                      title="Convert to scheduled task"
+                    >
+                      <CalendarClock className="h-3 w-3 mr-1" />
+                      Schedule
+                    </Button>
+                    <div className="w-px h-4 bg-border" />
+                  </>
+                )}
                 <Button
                   variant={isArtifactOpen ? "secondary" : "ghost"}
                   size="sm"
@@ -1637,6 +1672,14 @@ export function ChatPageContent({
                             Share
                           </>
                         )}
+                      </DropdownMenuItem>
+                    )}
+                    {canConvertToTask && (
+                      <DropdownMenuItem
+                        onSelect={() => setIsConvertToTaskDialogOpen(true)}
+                      >
+                        <CalendarClock className="h-4 w-4" />
+                        Schedule
                       </DropdownMenuItem>
                     )}
                     <DropdownMenuItem onSelect={toggleArtifactPanel}>
@@ -2045,6 +2088,14 @@ export function ChatPageContent({
           conversationId={conversationId}
           open={isShareDialogOpen}
           onOpenChange={setIsShareDialogOpen}
+        />
+      )}
+
+      {canConvertToTask && conversationId && (
+        <ConvertToScheduledTaskDialog
+          conversationId={conversationId}
+          open={isConvertToTaskDialogOpen}
+          onOpenChange={setIsConvertToTaskDialogOpen}
         />
       )}
 

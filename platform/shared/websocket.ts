@@ -350,6 +350,21 @@ export type McpDeploymentStatusesMessage = {
   };
 };
 
+export type ConversationMessagesUpdatedMessage = {
+  type: "conversation_messages_updated";
+  payload: {
+    conversationId: string;
+  };
+};
+
+export type ScheduleTriggerRunUpdatedMessage = {
+  type: "schedule_trigger_run_updated";
+  payload: {
+    triggerId: string;
+    runId: string;
+  };
+};
+
 export type ErrorMessage = {
   type: "error";
   payload: {
@@ -375,6 +390,8 @@ export type ServerWebSocketMessage =
   | McpExecErrorMessage
   | McpExecClosedMessage
   | McpDeploymentStatusesMessage
+  | ConversationMessagesUpdatedMessage
+  | ScheduleTriggerRunUpdatedMessage
   | ErrorMessage;
 
 /**

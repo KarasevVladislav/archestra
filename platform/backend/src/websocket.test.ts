@@ -8,6 +8,7 @@ import { betterAuth } from "@/auth";
 import type * as originalConfigModule from "@/config";
 import db, { schema } from "@/database";
 import AgentModel from "@/models/agent";
+import ConversationShareModel from "@/models/conversation-share";
 import { afterEach, beforeEach, describe, expect, test } from "@/test";
 
 vi.mock("@/config", async (importOriginal) => {
@@ -929,6 +930,106 @@ describe("websocket MCP deployment statuses", () => {
     const secondSubscription = service.mcpDeploymentStatusSubscriptions.get(ws);
     expect(secondSubscription).toBeDefined();
     expect(secondSubscription?.interval).not.toBe(firstInterval);
+  });
+});
+
+describe("websocket conversation message updates", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    service.clientContexts.clear();
+    service.browserSubscriptions.clear();
+    service.mcpLogsSubscriptions.clear();
+    service.mcpExecSubscriptions.clear();
+    service.mcpDeploymentStatusSubscriptions.clear();
+  });
+
+  afterEach(() => {
+    const rawService = websocketService as unknown as { wss: unknown | null };
+    rawService.wss = null;
+  });
+
+  test("notifies owner + team-share viewers with access", async ({
+    makeAgent,
+    makeConversation,
+    makeOrganization,
+    makeTeam,
+    makeTeamMember,
+    makeUser,
+  }) => {
+    const org = await makeOrganization();
+    const owner = await makeUser();
+    const allowedViewer = await makeUser();
+    const deniedViewer = await makeUser();
+    const agent = await makeAgent();
+    const conversation = await makeConversation(agent.id, {
+      userId: owner.id,
+      organizationId: org.id,
+    });
+
+    const team = await makeTeam(org.id, allowedViewer.id);
+    await makeTeamMember(team.id, allowedViewer.id);
+
+    await ConversationShareModel.upsert({
+      conversationId: conversation.id,
+      organizationId: org.id,
+      createdByUserId: owner.id,
+      visibility: "team",
+      teamIds: [team.id],
+      userIds: [],
+    });
+
+    const wsOwner = {
+      readyState: WS.OPEN,
+      send: vi.fn(),
+      close: vi.fn(),
+    } as unknown as WS;
+    const wsAllowed = {
+      readyState: WS.OPEN,
+      send: vi.fn(),
+      close: vi.fn(),
+    } as unknown as WS;
+    const wsDenied = {
+      readyState: WS.OPEN,
+      send: vi.fn(),
+      close: vi.fn(),
+    } as unknown as WS;
+
+    service.clientContexts.set(wsOwner, {
+      userId: owner.id,
+      organizationId: org.id,
+      userIsMcpServerAdmin: false,
+    });
+    service.clientContexts.set(wsAllowed, {
+      userId: allowedViewer.id,
+      organizationId: org.id,
+      userIsMcpServerAdmin: false,
+    });
+    service.clientContexts.set(wsDenied, {
+      userId: deniedViewer.id,
+      organizationId: org.id,
+      userIsMcpServerAdmin: false,
+    });
+
+    const rawService = websocketService as unknown as {
+      wss: { clients: Set<WS> } | null;
+      notifyConversationMessagesUpdated: (params: {
+        conversationId: string;
+      }) => Promise<void>;
+    };
+    rawService.wss = { clients: new Set([wsOwner, wsAllowed, wsDenied]) };
+
+    await rawService.notifyConversationMessagesUpdated({
+      conversationId: conversation.id,
+    });
+
+    const expected = JSON.stringify({
+      type: "conversation_messages_updated",
+      payload: { conversationId: conversation.id },
+    });
+
+    expect(wsOwner.send).toHaveBeenCalledWith(expected);
+    expect(wsAllowed.send).toHaveBeenCalledWith(expected);
+    expect(wsDenied.send).not.toHaveBeenCalled();
   });
 });
 

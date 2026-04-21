@@ -105,6 +105,45 @@ describe("ModelModel", () => {
     });
   });
 
+  describe("findProvidersByModelId", () => {
+    test("returns empty list when no models exist", async () => {
+      expect(
+        await ModelModel.findProvidersByModelId(
+          "nonexistent-model-id-for-providers",
+        ),
+      ).toEqual([]);
+    });
+
+    test("returns distinct providers in SupportedProvidersSchema order", async () => {
+      const modelId = `providers-order-${crypto.randomUUID().slice(0, 8)}`;
+      await ModelModel.create({
+        externalId: `anthropic/${modelId}`,
+        provider: "anthropic",
+        modelId,
+        inputModalities: ["text"],
+        outputModalities: ["text"],
+        promptPricePerToken: "0.000003",
+        completionPricePerToken: "0.000015",
+        lastSyncedAt: new Date(),
+      });
+      await ModelModel.create({
+        externalId: `openai/${modelId}`,
+        provider: "openai",
+        modelId,
+        inputModalities: ["text"],
+        outputModalities: ["text"],
+        promptPricePerToken: "0.000010",
+        completionPricePerToken: "0.000030",
+        lastSyncedAt: new Date(),
+      });
+
+      expect(await ModelModel.findProvidersByModelId(modelId)).toEqual([
+        "openai",
+        "anthropic",
+      ]);
+    });
+  });
+
   describe("findByProviderModelIds", () => {
     test("returns empty map when no keys provided", async () => {
       const map = await ModelModel.findByProviderModelIds([]);

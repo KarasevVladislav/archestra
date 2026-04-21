@@ -7,7 +7,6 @@ export const InsertMessageSchema = createInsertSchema(
   schema.messagesTable,
 ).omit({
   id: true,
-  createdAt: true,
 });
 
 export type Message = z.infer<typeof SelectMessageSchema>;

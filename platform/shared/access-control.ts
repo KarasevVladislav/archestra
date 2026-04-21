@@ -971,6 +971,12 @@ export const requiredEndpointPermissionsMap: Partial<
   [RouteId.CreateScheduleTriggerRunConversation]: {
     scheduledTask: ["create"],
   },
+  [RouteId.CreateScheduleTriggerFromConversation]: {
+    scheduledTask: ["create"],
+  },
+  [RouteId.GetConversationScheduleTriggerSuggestion]: {
+    scheduledTask: ["read"],
+  },
 
   // Knowledge Base Routes
   [RouteId.GetKnowledgeBases]: { knowledgeSource: ["read"] },

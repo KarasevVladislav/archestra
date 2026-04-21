@@ -121,6 +121,7 @@ const toolGroups: Record<ArchestraToolShortName, ToolGroup> = {
   artifact_write: ToolGroup.Chat,
   swap_agent: ToolGroup.Chat,
   swap_to_default_agent: ToolGroup.Chat,
+  convert_conversation_to_scheduled_task: ToolGroup.Chat,
 };
 
 // === Script entry point ===

@@ -121,6 +121,10 @@ export const TOOL_PERMISSIONS: Record<
   artifact_write: null,
   swap_agent: { resource: "agent", action: "read" },
   swap_to_default_agent: null,
+  convert_conversation_to_scheduled_task: {
+    resource: "scheduledTask",
+    action: "create",
+  },
 };
 
 /**

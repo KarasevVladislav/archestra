@@ -3104,4 +3104,118 @@ describe("InteractionModel", () => {
       expect(existingProfileInteraction).toBeDefined();
     });
   });
+
+  describe("listAgentUsageForSession", () => {
+    test("aggregates distinct agents within a session ordered by lastUsedAt desc", async ({
+      makeUser,
+      makeAgent,
+    }) => {
+      const user = await makeUser();
+      const agentA = await makeAgent();
+      const agentB = await makeAgent();
+      const sessionId = "session-agent-usage-1";
+
+      const baseRequest = { model: "gpt-4", messages: [] };
+      const baseResponse = {
+        id: "r",
+        object: "chat.completion" as const,
+        created: Date.now(),
+        model: "gpt-4",
+        choices: [
+          {
+            index: 0,
+            message: { role: "assistant" as const, content: "ok" },
+            finish_reason: "stop" as const,
+          },
+        ],
+      };
+
+      await InteractionModel.create({
+        profileId: agentA.id,
+        userId: user.id,
+        sessionId,
+        request: baseRequest,
+        response: baseResponse,
+        type: "openai:chatCompletions",
+      });
+      await InteractionModel.create({
+        profileId: agentA.id,
+        userId: user.id,
+        sessionId,
+        request: baseRequest,
+        response: baseResponse,
+        type: "openai:chatCompletions",
+      });
+      // Small delay to guarantee strictly greater createdAt ordering
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      await InteractionModel.create({
+        profileId: agentB.id,
+        userId: user.id,
+        sessionId,
+        request: baseRequest,
+        response: baseResponse,
+        type: "openai:chatCompletions",
+      });
+
+      const usage = await InteractionModel.listAgentUsageForSession({
+        sessionId,
+        userId: user.id,
+        organizationId: crypto.randomUUID(),
+      });
+
+      expect(usage).toHaveLength(2);
+      expect(usage[0].agentId).toBe(agentB.id);
+      expect(usage[0].count).toBe(1);
+      expect(usage[1].agentId).toBe(agentA.id);
+      expect(usage[1].count).toBe(2);
+      expect(usage[0].lastUsedAt.getTime()).toBeGreaterThanOrEqual(
+        usage[1].lastUsedAt.getTime(),
+      );
+    });
+
+    test("returns empty array for unknown session or non-matching user", async ({
+      makeUser,
+      makeAgent,
+    }) => {
+      const user = await makeUser();
+      const otherUser = await makeUser();
+      const agent = await makeAgent();
+      const sessionId = "session-agent-usage-2";
+
+      await InteractionModel.create({
+        profileId: agent.id,
+        userId: user.id,
+        sessionId,
+        request: { model: "gpt-4", messages: [] },
+        response: {
+          id: "r",
+          object: "chat.completion" as const,
+          created: Date.now(),
+          model: "gpt-4",
+          choices: [
+            {
+              index: 0,
+              message: { role: "assistant" as const, content: "ok" },
+              finish_reason: "stop" as const,
+            },
+          ],
+        },
+        type: "openai:chatCompletions",
+      });
+
+      const empty1 = await InteractionModel.listAgentUsageForSession({
+        sessionId: "nope",
+        userId: user.id,
+        organizationId: crypto.randomUUID(),
+      });
+      expect(empty1).toHaveLength(0);
+
+      const empty2 = await InteractionModel.listAgentUsageForSession({
+        sessionId,
+        userId: otherUser.id,
+        organizationId: crypto.randomUUID(),
+      });
+      expect(empty2).toHaveLength(0);
+    });
+  });
 });
