@@ -652,6 +652,7 @@ export async function handleLLMProxy<
       reply,
       provider.extractErrorMessage,
       requestAdapter.isStreaming(),
+      provider.extractInternalCode.bind(provider),
     );
   }
 }
@@ -946,7 +947,13 @@ async function handleStreaming<
     streamCompleted = true;
     return reply;
   } catch (error) {
-    return handleError(error, reply, provider.extractErrorMessage, true);
+    return handleError(
+      error,
+      reply,
+      provider.extractErrorMessage,
+      true,
+      provider.extractInternalCode.bind(provider),
+    );
   } finally {
     // Always record interaction (whether stream completed or was aborted)
     if (!streamCompleted) {
@@ -1279,7 +1286,11 @@ async function handleNonStreaming<
         providerType: provider.interactionType,
         request: originalRequest,
         processedRequest: request,
-        response: responseAdapter.getOriginalResponse(),
+        // Bedrock<->OpenAI compat need to return OpenAI response to client, but store bedrock response for interaction log.
+        // Providers which need this behavior should implement getLoggedResponse() for persisting interaction and getOriginalResponse() for returning to client.
+        response:
+          responseAdapter.getLoggedResponse?.() ??
+          responseAdapter.getOriginalResponse(),
         actualModel,
         baselineModel,
         usage,

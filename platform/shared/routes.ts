@@ -23,7 +23,8 @@ export const RouteId = {
   GetScheduleTriggerRuns: "getScheduleTriggerRuns",
   GetScheduleTriggerRun: "getScheduleTriggerRun",
   CreateScheduleTriggerRunConversation: "createScheduleTriggerRunConversation",
-  CreateScheduleTriggerFromConversation: "createScheduleTriggerFromConversation",
+  CreateScheduleTriggerFromConversation:
+    "createScheduleTriggerFromConversation",
   GetConversationScheduleTriggerSuggestion:
     "getConversationScheduleTriggerSuggestion",
 
@@ -228,6 +229,14 @@ export const RouteId = {
   BedrockConverseWithAgentAndModel: "bedrockConverseWithAgentAndModel",
   BedrockConverseStreamWithAgentAndModel:
     "bedrockConverseStreamWithAgentAndModel",
+  // OpenAI-compatible routes (translate OpenAI chat/completions ↔ Converse)
+  BedrockOpenaiChatCompletionsWithDefaultAgent:
+    "bedrockOpenaiChatCompletionsWithDefaultAgent",
+  BedrockOpenaiChatCompletionsWithAgent:
+    "bedrockOpenaiChatCompletionsWithAgent",
+  BedrockOpenaiListModelsWithDefaultAgent:
+    "bedrockOpenaiListModelsWithDefaultAgent",
+  BedrockOpenaiListModelsWithAgent: "bedrockOpenaiListModelsWithAgent",
 
   // Proxy Routes - MiniMax
   MinimaxChatCompletionsWithDefaultAgent:
@@ -342,6 +351,7 @@ export const RouteId = {
 
   // User Routes
   GetUserPermissions: "getUserPermissions",
+  GetImpersonableUsers: "getImpersonableUsers",
 
   // Team Token Routes
   GetTokens: "getTokens",

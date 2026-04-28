@@ -29,6 +29,7 @@ enum ToolGroup {
   ToolAssignment = "Tool Assignment",
   KnowledgeManagement = "Knowledge Management",
   Chat = "Chat",
+  Meta = "Meta",
 }
 
 const groupOrder: Record<ToolGroup, number> = {
@@ -42,6 +43,7 @@ const groupOrder: Record<ToolGroup, number> = {
   [ToolGroup.ToolAssignment]: 7,
   [ToolGroup.KnowledgeManagement]: 8,
   [ToolGroup.Chat]: 9,
+  [ToolGroup.Meta]: 10,
 };
 
 /**
@@ -122,6 +124,8 @@ const toolGroups: Record<ArchestraToolShortName, ToolGroup> = {
   swap_agent: ToolGroup.Chat,
   swap_to_default_agent: ToolGroup.Chat,
   convert_conversation_to_scheduled_task: ToolGroup.Chat,
+  search_tools: ToolGroup.Meta,
+  run_tool: ToolGroup.Meta,
 };
 
 // === Script entry point ===

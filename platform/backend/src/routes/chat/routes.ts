@@ -40,6 +40,7 @@ import { extractAndIngestDocuments } from "@/knowledge-base";
 import logger from "@/logging";
 import {
   AgentModel,
+  ConversationChatErrorModel,
   ConversationEnabledToolModel,
   ConversationModel,
   ConversationShareModel,
@@ -449,6 +450,10 @@ const chatRoutes: FastifyPluginAsyncZod = async (fastify) => {
                 const errorForFrontend = slimChatErrorUi
                   ? sanitizeChatErrorForFrontend(fullError)
                   : fullError;
+                persistConversationChatError({
+                  conversationId,
+                  error: errorForFrontend,
+                });
 
                 logger.info(
                   {
@@ -645,10 +650,54 @@ const chatRoutes: FastifyPluginAsyncZod = async (fastify) => {
                   }
                 }
 
+                // toUIMessageStream invokes onError twice for the same upstream
+                // error (once when formatting the error chunk's errorText, once
+                // as a notification when the chunk is walked downstream). Guard
+                // so we don't persist or log the same error twice.
+                let chatErrorHandled = false;
+                let serializedChatError = "";
+
                 writer.merge(
                   result.toUIMessageStream({
                     originalMessages: messages as UIMessage[],
                     onError: (error) => {
+                      if (chatErrorHandled) {
+                        return serializedChatError;
+                      }
+                      chatErrorHandled = true;
+
+                      const traceContext = getActiveTraceContext();
+                      const correlationLogFields =
+                        getCorrelationLogFields(traceContext);
+
+                      // Use pre-built error from subagent if available (preserves correct provider),
+                      // otherwise map the error with the current provider
+                      const mappedError: ChatErrorResponse =
+                        error instanceof ProviderError
+                          ? error.chatErrorResponse
+                          : mapProviderError(error, provider);
+                      const fullError = { ...mappedError, ...traceContext };
+                      const errorForFrontend = slimChatErrorUi
+                        ? sanitizeChatErrorForFrontend(fullError)
+                        : fullError;
+
+                      // mapProviderError safely serializes raw errors, but add defensive try-catch
+                      try {
+                        serializedChatError = JSON.stringify(errorForFrontend);
+                      } catch (stringifyError) {
+                        logger.error(
+                          {
+                            stringifyError,
+                            errorCode: mappedError.code,
+                            ...correlationLogFields,
+                          },
+                          "Failed to stringify mapped error, returning minimal error",
+                        );
+                        serializedChatError = JSON.stringify(
+                          getMinimalFrontendError(errorForFrontend),
+                        );
+                      }
+
                       // Claim persistence before the async work below starts,
                       // otherwise onFinish can race and also persist (duplicates).
                       const shouldPersist =
@@ -656,9 +705,6 @@ const chatRoutes: FastifyPluginAsyncZod = async (fastify) => {
                       if (shouldPersist) {
                         messagesPersisted = true;
                       }
-                      const traceContext = getActiveTraceContext();
-                      const correlationLogFields =
-                        getCorrelationLogFields(traceContext);
 
                       (async () => {
                         logger.error(
@@ -695,16 +741,10 @@ const chatRoutes: FastifyPluginAsyncZod = async (fastify) => {
                         );
                       });
 
-                      // Use pre-built error from subagent if available (preserves correct provider),
-                      // otherwise map the error with the current provider
-                      const mappedError: ChatErrorResponse =
-                        error instanceof ProviderError
-                          ? error.chatErrorResponse
-                          : mapProviderError(error, provider);
-                      const fullError = { ...mappedError, ...traceContext };
-                      const errorForFrontend = slimChatErrorUi
-                        ? sanitizeChatErrorForFrontend(fullError)
-                        : fullError;
+                      persistConversationChatError({
+                        conversationId,
+                        error: errorForFrontend,
+                      });
 
                       logger.info(
                         {
@@ -717,22 +757,7 @@ const chatRoutes: FastifyPluginAsyncZod = async (fastify) => {
                         "Returning mapped error to frontend via stream",
                       );
 
-                      // mapProviderError safely serializes raw errors, but add defensive try-catch
-                      try {
-                        return JSON.stringify(errorForFrontend);
-                      } catch (stringifyError) {
-                        logger.error(
-                          {
-                            stringifyError,
-                            errorCode: mappedError.code,
-                            ...correlationLogFields,
-                          },
-                          "Failed to stringify mapped error, returning minimal error",
-                        );
-                        return JSON.stringify(
-                          getMinimalFrontendError(errorForFrontend),
-                        );
-                      }
+                      return serializedChatError;
                     },
                     onFinish: async ({ messages: finalMessages }) => {
                       removeAbortListeners();
@@ -2018,6 +2043,31 @@ async function persistNewMessages(
       `Failed to persist messages during ${context}`,
     );
     throw error;
+  }
+}
+
+function persistConversationChatError(params: {
+  conversationId: string;
+  error: ChatErrorResponse;
+}) {
+  const chatError = getSerializableChatError(params.error);
+
+  void ConversationChatErrorModel.create({
+    conversationId: params.conversationId,
+    error: chatError,
+  }).catch((error) => {
+    logger.error(
+      { error, conversationId: params.conversationId },
+      "Failed to persist chat error event on conversation",
+    );
+  });
+}
+
+function getSerializableChatError(error: ChatErrorResponse): ChatErrorResponse {
+  try {
+    return JSON.parse(JSON.stringify(error)) as ChatErrorResponse;
+  } catch {
+    return getMinimalFrontendError(error);
   }
 }
 

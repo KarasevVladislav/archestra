@@ -16,7 +16,7 @@ import type {
 /**
  * Effective pricing result with source tracking.
  */
-export interface EffectivePricing {
+interface EffectivePricing {
   pricePerMillionInput: string;
   pricePerMillionOutput: string;
   source: PriceSource;

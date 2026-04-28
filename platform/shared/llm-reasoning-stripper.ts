@@ -15,14 +15,11 @@ export const DEFAULT_LLM_REASONING_TAGS = [
 ] as const;
 
 function buildPairedRegex(tag: string): RegExp {
-  return new RegExp(
-    "<" + tag + "(\\s+[^>]*)?>[\\s\\S]*?<\\/" + tag + "\\s*>",
-    "gi",
-  );
+  return new RegExp(`<${tag}(\\s+[^>]*)?>[\\s\\S]*?<\\/${tag}\\s*>`, "gi");
 }
 
 function buildUnclosedRegex(tag: string): RegExp {
-  return new RegExp("<" + tag + "(\\s+[^>]*)?>[\\s\\S]*$", "i");
+  return new RegExp(`<${tag}(\\s+[^>]*)?>[\\s\\S]*$`, "i");
 }
 
 export function stripLlmReasoningTags(
@@ -36,7 +33,7 @@ export function stripLlmReasoningTags(
   }
 
   for (const tag of tags) {
-    const closeRegex = new RegExp("<\\/" + tag + "\\s*>", "i");
+    const closeRegex = new RegExp(`<\\/${tag}\\s*>`, "i");
     if (!closeRegex.test(out)) {
       out = out.replace(buildUnclosedRegex(tag), "");
     }
@@ -44,4 +41,3 @@ export function stripLlmReasoningTags(
 
   return out.replace(/\n{3,}/g, "\n\n").trim();
 }
-

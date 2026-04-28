@@ -1,4 +1,31 @@
-import type { SupportedProvider } from "./model-constants";
+import { z } from "zod";
+import {
+  type SupportedProvider,
+  SupportedProvidersSchema,
+} from "./model-constants";
+
+// =============================================================================
+// Archestra-Normalized Internal Error Codes
+// =============================================================================
+
+/**
+ * Archestra-normalized error codes emitted by an adapter's
+ * `extractInternalCode` classifier. The value flows through
+ * `ApiError.internalCode` → the `internal_code` field on the error response
+ * body → the chat-error mapper, which uses it as a uniform cross-provider
+ * signal.
+ *
+ * Providers differ in how they surface categories like "context too long":
+ * some return a structured `error.code`, others only a message. Classifying
+ * in the adapter and emitting a normalized code keeps the mapper a simple
+ * lookup and lets each provider's idiosyncrasies stay local to its adapter.
+ */
+export const ArchestraInternalErrorCode = {
+  ContextLengthExceeded: "context_length_exceeded",
+} as const;
+
+export type ArchestraInternalErrorCode =
+  (typeof ArchestraInternalErrorCode)[keyof typeof ArchestraInternalErrorCode];
 
 // =============================================================================
 // Provider-Specific Error Types (from official documentation)
@@ -19,6 +46,7 @@ export const OpenAIErrorTypes = {
   RATE_LIMIT: "rate_limit_exceeded",
   SERVER_ERROR: "server_error",
   SERVICE_UNAVAILABLE: "service_unavailable",
+  API_VALIDATION_ERROR: "api_validation_error",
   // Additional codes that appear in error.code field
   INVALID_API_KEY_CODE: "invalid_api_key",
   MODEL_NOT_FOUND: "model_not_found",
@@ -186,6 +214,7 @@ export const ZhipuaiErrorTypes = {
   NO_PERMISSION: "1220",
   API_OFFLINE: "1221",
   NETWORK_ERROR: "1234",
+  CONTEXT_LENGTH_EXCEEDED: "1261", // "Prompt exceeds max length"
 
   // Policy block errors (1300-1309)
   CONTENT_FILTERED: "1301", // Unsafe or sensitive content detected
@@ -309,6 +338,24 @@ export interface ChatErrorResponse {
     raw?: unknown;
   };
 }
+
+export const ChatErrorResponseSchema: z.ZodType<ChatErrorResponse> = z.object({
+  code: z.nativeEnum(ChatErrorCode),
+  message: z.string(),
+  isRetryable: z.boolean(),
+  sessionId: z.string().optional(),
+  traceId: z.string().optional(),
+  spanId: z.string().optional(),
+  originalError: z
+    .object({
+      provider: SupportedProvidersSchema.optional(),
+      status: z.number().optional(),
+      message: z.string().optional(),
+      type: z.string().optional(),
+      raw: z.unknown().optional(),
+    })
+    .optional(),
+});
 
 /**
  * Type guard to check if an object is a ChatErrorResponse

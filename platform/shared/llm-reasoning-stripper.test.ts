@@ -36,4 +36,3 @@ describe("stripLlmReasoningTags", () => {
     expect(DEFAULT_LLM_REASONING_TAGS.length).toBeGreaterThan(0);
   });
 });
-

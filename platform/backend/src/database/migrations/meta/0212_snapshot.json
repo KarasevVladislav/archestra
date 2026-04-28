@@ -1,5 +1,5 @@
 {
-  "id": "80d72042-a2e4-4363-9d58-ac3d0a5b3f65",
+  "id": "deff4e60-8d11-4d5d-bdb9-aeb41486e0d1",
   "prevId": "978d2384-d87c-48ab-a2c9-e045036f3677",
   "version": "7",
   "dialect": "postgresql",
@@ -1979,6 +1979,12 @@
         "artifact": {
           "name": "artifact",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_chat_error": {
+          "name": "last_chat_error",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },
@@ -6539,30 +6545,9 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "linked_conversation_id": {
-          "name": "linked_conversation_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {
-        "schedule_triggers_linked_conversation_id_idx": {
-          "name": "schedule_triggers_linked_conversation_id_idx",
-          "columns": [
-            {
-              "expression": "linked_conversation_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "with": {},
-          "method": "btree",
-          "concurrently": false
-        },
         "schedule_triggers_agent_id_idx": {
           "name": "schedule_triggers_agent_id_idx",
           "columns": [
@@ -6574,9 +6559,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "schedule_triggers_actor_user_id_idx": {
           "name": "schedule_triggers_actor_user_id_idx",
@@ -6589,9 +6574,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "schedule_triggers_enabled_last_executed_at_idx": {
           "name": "schedule_triggers_enabled_last_executed_at_idx",
@@ -6610,50 +6595,37 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "schedule_triggers_agent_id_agents_id_fk": {
           "name": "schedule_triggers_agent_id_agents_id_fk",
           "tableFrom": "schedule_triggers",
+          "tableTo": "agents",
           "columnsFrom": [
             "agent_id"
           ],
-          "tableTo": "agents",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "schedule_triggers_actor_user_id_user_id_fk": {
           "name": "schedule_triggers_actor_user_id_user_id_fk",
           "tableFrom": "schedule_triggers",
+          "tableTo": "user",
           "columnsFrom": [
             "actor_user_id"
           ],
-          "tableTo": "user",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
-        },
-        "schedule_triggers_linked_conversation_id_conversations_id_fk": {
-          "name": "schedule_triggers_linked_conversation_id_conversations_id_fk",
-          "tableFrom": "schedule_triggers",
-          "columnsFrom": [
-            "linked_conversation_id"
-          ],
-          "tableTo": "conversations",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "set null"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
