@@ -50,7 +50,6 @@ export function ConvertToScheduledTaskDialog({
   );
   const [useAiSummary, setUseAiSummary] = useState(true);
   const [messageTemplate, setMessageTemplate] = useState("");
-  const [enabled, setEnabled] = useState(true);
   const [replyInSameConversation, setReplyInSameConversation] = useState(false);
   const [hydrated, setHydrated] = useState(false);
 
@@ -121,7 +120,6 @@ export function ConvertToScheduledTaskDialog({
     setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
     setUseAiSummary(true);
     setMessageTemplate("");
-    setEnabled(true);
     setReplyInSameConversation(false);
     createMutationResetRef.current();
   }, [open]);
@@ -192,9 +190,8 @@ export function ConvertToScheduledTaskDialog({
       cronExpression,
       timezone,
       messageTemplate,
-      enabled,
     }),
-    [name, agentId, cronExpression, timezone, messageTemplate, enabled],
+    [name, agentId, cronExpression, timezone, messageTemplate],
   );
 
   const handleSubmit = async () => {
@@ -206,7 +203,6 @@ export function ConvertToScheduledTaskDialog({
       agentId,
       cronExpression: cronExpression.trim(),
       timezone: trimmedTimezone,
-      enabled,
       ...(replyInSameConversation ? { replyInSameConversation: true } : {}),
       ...(useAiSummary ? {} : { messageTemplate: trimmedTemplate }),
     });
@@ -236,11 +232,9 @@ export function ConvertToScheduledTaskDialog({
       onNameChange={setName}
       onAgentChange={setAgentId}
       onCronExpressionChange={setCronExpression}
-      onTimezoneChange={setTimezone}
-      onEnabledChange={setEnabled}
       onMessageTemplateChange={setMessageTemplate}
-      showTimezone
-      showEnabled
+      showTimezone={false}
+      showEnabled={false}
       agentSelectDisabled={linkedSelectorDisabled}
       agentSelectHelpText={
         replyInSameConversation

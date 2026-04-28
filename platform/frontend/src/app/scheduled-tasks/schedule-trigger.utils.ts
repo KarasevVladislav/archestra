@@ -13,6 +13,7 @@ export type ScheduleTriggerFormState = {
   cronExpression: string;
   timezone: string;
   messageTemplate: string;
+  keepResultsInSameChat: boolean;
 };
 
 export const DEFAULT_FORM_STATE = (): ScheduleTriggerFormState => ({
@@ -21,6 +22,7 @@ export const DEFAULT_FORM_STATE = (): ScheduleTriggerFormState => ({
   cronExpression: "0 9 * * 1-5",
   timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
   messageTemplate: "",
+  keepResultsInSameChat: false,
 });
 
 export function buildScheduleTriggerPayload(
@@ -32,6 +34,7 @@ export function buildScheduleTriggerPayload(
     cronExpression: formState.cronExpression.trim(),
     timezone: formState.timezone.trim(),
     messageTemplate: formState.messageTemplate.trim(),
+    keepResultsInSameChat: formState.keepResultsInSameChat,
   };
 
   if (

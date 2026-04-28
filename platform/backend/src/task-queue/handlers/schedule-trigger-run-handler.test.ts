@@ -27,6 +27,19 @@ const mockIsAgentValidForLinkedConversation = vi.hoisted(() =>
   vi.fn().mockResolvedValue(true),
 );
 
+const mockDbTransaction = vi.hoisted(() => vi.fn());
+const mockResolveConversationLlmSelectionForAgent = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({
+    selectedModel: "gpt-4o",
+    selectedProvider: "openai",
+    chatApiKeyId: null,
+  }),
+);
+const mockTxExecute = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+const mockTxSelect = vi.hoisted(() => vi.fn());
+const mockTxInsert = vi.hoisted(() => vi.fn());
+const mockTxUpdate = vi.hoisted(() => vi.fn());
+
 vi.mock("@/models", () => ({
   ScheduleTriggerRunModel: {
     findById: mockRunFindById,
@@ -53,6 +66,27 @@ vi.mock("@/models", () => ({
 
 vi.mock("@/auth", () => ({
   hasAnyAgentTypeAdminPermission: mockHasAnyAgentTypeAdminPermission,
+}));
+
+vi.mock("@/database", () => ({
+  default: {
+    transaction: mockDbTransaction,
+  },
+  schema: {
+    scheduleTriggersTable: {
+      id: {},
+      organizationId: {},
+      linkedConversationId: {},
+    },
+    conversationsTable: {
+      id: {},
+    },
+  },
+}));
+
+vi.mock("@/utils/llm-resolution", () => ({
+  resolveConversationLlmSelectionForAgent:
+    mockResolveConversationLlmSelectionForAgent,
 }));
 
 vi.mock("@/schedule-triggers/append-linked-run-messages", () => ({
@@ -120,6 +154,7 @@ const makeTrigger = (overrides = {}) => ({
   cronExpression: "* * * * *",
   timezone: "UTC",
   enabled: true,
+  keepResultsInSameChat: false,
   actorUserId: "user-1",
   lastExecutedAt: null,
   createdAt: new Date(),
@@ -163,6 +198,19 @@ describe("handleScheduleTriggerRunExecution", () => {
     mockIsAgentValidForLinkedConversation.mockResolvedValue(true);
     mockNotifyConversationMessagesUpdated.mockClear();
     vi.mocked(logger.error).mockClear();
+
+    mockTxExecute.mockReset().mockResolvedValue(undefined);
+    mockTxSelect.mockReset();
+    mockTxInsert.mockReset();
+    mockTxUpdate.mockReset();
+    mockDbTransaction.mockImplementation(async (fn: (tx: unknown) => unknown) =>
+      fn({
+        execute: mockTxExecute,
+        select: mockTxSelect,
+        insert: mockTxInsert,
+        update: mockTxUpdate,
+      }),
+    );
   });
 
   test("executes A2A message and marks run as success", async () => {
@@ -231,14 +279,59 @@ describe("handleScheduleTriggerRunExecution", () => {
     expect(mockSetChatConversationId).toHaveBeenCalledWith("run-1", linkedId);
     expect(mockNotifyConversationMessagesUpdated).toHaveBeenCalledWith({
       conversationId: linkedId,
-      organizationId: "org-1",
-      ownerUserId: "user-1",
     });
     expect(mockRunMarkCompleted).toHaveBeenCalledWith({
       runId: "run-1",
       status: "success",
       error: null,
     });
+  });
+
+  test("creates a linked chat on first successful run when keepResultsInSameChat is enabled", async () => {
+    const createdConversationId = "00000000-0000-4000-8000-000000000123";
+    mockRunFindById.mockResolvedValue(makeRun());
+    mockTriggerFindById.mockResolvedValue(
+      makeTrigger({ keepResultsInSameChat: true, linkedConversationId: null }),
+    );
+    mockUserGetById.mockResolvedValue(makeUser());
+    mockAgentFindById.mockResolvedValue(makeAgent());
+    mockUserHasAgentAccess.mockResolvedValue(true);
+
+    mockTxSelect.mockReturnValue({
+      from: () => ({
+        where: () => ({
+          limit: () => Promise.resolve([{ linkedConversationId: null }]),
+        }),
+      }),
+    });
+    mockTxInsert.mockReturnValue({
+      values: () => ({
+        returning: () => Promise.resolve([{ id: createdConversationId }]),
+      }),
+    });
+    mockTxUpdate.mockReturnValue({
+      set: () => ({
+        where: () => Promise.resolve(),
+      }),
+    });
+
+    await handleScheduleTriggerRunExecution({
+      runId: "run-1",
+      triggerId: "trigger-1",
+    });
+
+    expect(mockDbTransaction).toHaveBeenCalledTimes(1);
+    expect(mockAppendLinkedScheduleRunMessagesToConversation).toHaveBeenCalledWith(
+      {
+        conversationId: createdConversationId,
+        messageTemplate: "Run the task",
+        assistantText: "done",
+      },
+    );
+    expect(mockSetChatConversationId).toHaveBeenCalledWith(
+      "run-1",
+      createdConversationId,
+    );
   });
 
   test("marks run success when linked conversation sync fails after successful execution", async () => {

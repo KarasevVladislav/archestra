@@ -41,6 +41,7 @@ const ScheduleTriggerBodyFieldsSchema = z.object({
   name: z.string().min(1),
   agentId: UuidIdSchema,
   enabled: z.boolean().optional().default(true),
+  keepResultsInSameChat: z.boolean().optional().default(false),
   ...ScheduleTriggerConfigurationSchemaBase.shape,
 });
 
@@ -250,6 +251,7 @@ const scheduleTriggerRoutes: FastifyPluginAsyncZod = async (fastify) => {
         cronExpression: body.cronExpression,
         timezone: body.timezone,
         enabled: body.enabled ?? true,
+        keepResultsInSameChat: body.keepResultsInSameChat ?? false,
         actorUserId: user.id,
       });
 

@@ -1,5 +1,7 @@
 import { executeA2AMessage } from "@/agents/a2a-executor";
 import { hasAnyAgentTypeAdminPermission } from "@/auth";
+import { and, eq, sql } from "drizzle-orm";
+import db, { schema } from "@/database";
 import logger from "@/logging";
 import {
   AgentModel,
@@ -12,6 +14,7 @@ import { metrics } from "@/observability";
 import { appendLinkedScheduleRunMessagesToConversation } from "@/schedule-triggers/append-linked-run-messages";
 import { scheduleTriggerConverterService } from "@/schedule-triggers/converter";
 import { resolvePlaceholders } from "@/schedule-triggers/resolve-placeholders";
+import { resolveConversationLlmSelectionForAgent } from "@/utils/llm-resolution";
 import websocketService from "@/websocket";
 
 const LINKED_CONVERSATION_AUTO_HEAL_WARNING =
@@ -90,9 +93,8 @@ export async function handleScheduleTriggerRunExecution(
       throw new Error("Scheduled trigger target must be an internal agent");
     }
 
-    const linkedConversationId = trigger.linkedConversationId;
-    const sessionId =
-      linkedConversationId ?? `scheduled-${run.id}`;
+    let linkedConversationId = trigger.linkedConversationId;
+    const sessionId = linkedConversationId ?? `scheduled-${run.id}`;
 
     const resolvedMessage = resolvePlaceholders(
       trigger.messageTemplate,
@@ -109,6 +111,75 @@ export async function handleScheduleTriggerRunExecution(
       source: "schedule-trigger",
       scheduleTriggerRunId: run.id,
     });
+
+    if (
+      status === "success" &&
+      trigger.keepResultsInSameChat &&
+      !linkedConversationId
+    ) {
+      const llmSelection = await resolveConversationLlmSelectionForAgent({
+        agent: {
+          llmApiKeyId: triggerAgent.llmApiKeyId ?? null,
+          llmModel: triggerAgent.llmModel ?? null,
+        },
+        organizationId: trigger.organizationId,
+        userId: actor.id,
+      });
+
+      linkedConversationId = await db.transaction(async (tx) => {
+        await tx.execute(
+          sql`SELECT pg_advisory_xact_lock(hashtextextended(${trigger.id}, 0))`,
+        );
+
+        const [fresh] = await tx
+          .select({
+            linkedConversationId: schema.scheduleTriggersTable.linkedConversationId,
+          })
+          .from(schema.scheduleTriggersTable)
+          .where(
+            and(
+              eq(schema.scheduleTriggersTable.id, trigger.id),
+              eq(
+                schema.scheduleTriggersTable.organizationId,
+                trigger.organizationId,
+              ),
+            ),
+          )
+          .limit(1);
+
+        if (fresh?.linkedConversationId) {
+          return fresh.linkedConversationId;
+        }
+
+        const titleBase = trigger.name?.trim() || "Scheduled task";
+        const title =
+          titleBase.length > 80 ? `${titleBase.slice(0, 77).trimEnd()}...` : titleBase;
+
+        const [conversation] = await tx
+          .insert(schema.conversationsTable)
+          .values({
+            userId: actor.id,
+            organizationId: trigger.organizationId,
+            agentId: trigger.agentId,
+            title,
+            selectedModel: llmSelection.selectedModel,
+            selectedProvider: llmSelection.selectedProvider,
+            chatApiKeyId: llmSelection.chatApiKeyId,
+          })
+          .returning({ id: schema.conversationsTable.id });
+
+        if (!conversation?.id) {
+          throw new Error("Failed to create linked conversation for schedule trigger");
+        }
+
+        await tx
+          .update(schema.scheduleTriggersTable)
+          .set({ linkedConversationId: conversation.id })
+          .where(eq(schema.scheduleTriggersTable.id, trigger.id));
+
+        return conversation.id;
+      });
+    }
 
     if (linkedConversationId) {
       const linkedAgentValid =

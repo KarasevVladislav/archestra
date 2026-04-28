@@ -287,6 +287,7 @@ function triggerColumns() {
     cronExpression: schema.scheduleTriggersTable.cronExpression,
     timezone: schema.scheduleTriggersTable.timezone,
     enabled: schema.scheduleTriggersTable.enabled,
+    keepResultsInSameChat: schema.scheduleTriggersTable.keepResultsInSameChat,
     actorUserId: schema.scheduleTriggersTable.actorUserId,
     lastExecutedAt: schema.scheduleTriggersTable.lastExecutedAt,
     createdAt: schema.scheduleTriggersTable.createdAt,

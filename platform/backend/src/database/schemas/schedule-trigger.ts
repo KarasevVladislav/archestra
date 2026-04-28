@@ -23,6 +23,9 @@ const scheduleTriggersTable = pgTable(
     cronExpression: text("cron_expression").notNull(),
     timezone: text("timezone").notNull(),
     enabled: boolean("enabled").notNull().default(true),
+    keepResultsInSameChat: boolean("keep_results_in_same_chat")
+      .notNull()
+      .default(false),
     actorUserId: text("actor_user_id")
       .notNull()
       .references(() => usersTable.id, { onDelete: "cascade" }),

@@ -42,6 +42,7 @@ export type ScheduleTrigger = {
   cronExpression: string;
   timezone: string;
   enabled: boolean;
+  keepResultsInSameChat: boolean;
   actorUserId: string;
   lastExecutedAt: string | null;
   createdAt: string;
@@ -85,6 +86,7 @@ type ScheduleTriggerRequestBody = {
   timezone: string;
   messageTemplate: string;
   enabled?: boolean;
+  keepResultsInSameChat?: boolean;
 };
 
 export const scheduleTriggerKeys = {

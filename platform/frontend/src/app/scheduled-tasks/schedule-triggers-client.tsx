@@ -260,6 +260,7 @@ export function ScheduleTriggersIndexPage() {
       cronExpression: trigger.cronExpression,
       timezone: trigger.timezone,
       messageTemplate: trigger.messageTemplate,
+      keepResultsInSameChat: trigger.keepResultsInSameChat,
     });
   }, []);
 
@@ -486,6 +487,29 @@ export function ScheduleTriggersIndexPage() {
         hasAgents={hasAgents}
         isSaving={isSaving}
         isFormValid={formPayload !== null}
+        postEnabledSection={
+          <div className="flex items-center justify-between rounded-md border p-3">
+            <div>
+              <Label htmlFor="dialog-keep-results-in-same-chat">
+                Keep results in same chat
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                When enabled, successful runs will be appended to a single chat
+                created on the first successful run.
+              </p>
+            </div>
+            <Switch
+              id="dialog-keep-results-in-same-chat"
+              checked={formState.keepResultsInSameChat}
+              onCheckedChange={(checked) => {
+                setFormState((current) => ({
+                  ...current,
+                  keepResultsInSameChat: checked,
+                }));
+              }}
+            />
+          </div>
+        }
         onSubmit={() => {
           void submitForm();
         }}
@@ -615,6 +639,7 @@ export function ScheduleTriggerDetailPage({
       cronExpression: trigger.cronExpression,
       timezone: trigger.timezone,
       messageTemplate: trigger.messageTemplate,
+      keepResultsInSameChat: trigger.keepResultsInSameChat,
     });
   }, [trigger]);
 
@@ -697,6 +722,7 @@ export function ScheduleTriggerDetailPage({
       cronExpression: trigger.cronExpression,
       timezone: trigger.timezone,
       messageTemplate: trigger.messageTemplate,
+      keepResultsInSameChat: trigger.keepResultsInSameChat,
     });
     setEditDialogOpen(true);
   };
@@ -894,6 +920,11 @@ export function ScheduleTriggerDetailPage({
           </Link>
           .
         </p>
+      ) : trigger.keepResultsInSameChat ? (
+        <p className="text-sm text-muted-foreground">
+          Successful runs will be appended to a single chat, which will be created
+          on the first successful run.
+        </p>
       ) : null}
 
       {/* Runs table */}
@@ -923,6 +954,29 @@ export function ScheduleTriggerDetailPage({
         hasAgents={agents.length > 0}
         isSaving={isSaving}
         isFormValid={formPayload !== null}
+        postEnabledSection={
+          <div className="flex items-center justify-between rounded-md border p-3">
+            <div>
+              <Label htmlFor="dialog-keep-results-in-same-chat-detail">
+                Keep results in same chat
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                When enabled, successful runs will be appended to a single chat
+                created on the first successful run.
+              </p>
+            </div>
+            <Switch
+              id="dialog-keep-results-in-same-chat-detail"
+              checked={formState.keepResultsInSameChat}
+              onCheckedChange={(checked) => {
+                setFormState((current) => ({
+                  ...current,
+                  keepResultsInSameChat: checked,
+                }));
+              }}
+            />
+          </div>
+        }
         onSubmit={() => {
           void submitForm();
         }}
