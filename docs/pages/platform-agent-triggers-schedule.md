@@ -23,7 +23,7 @@ Any chat conversation can be turned into a Scheduled Task directly from the chat
 - **Agent**: the agent that handled the most recent interaction in the chat. If the chat used `swap_agent`/`swap_to_default_agent`, the last active agent is chosen.
 Falls back to the user's default agent, then the organization's default.
 - **Name**: derived from the conversation title.
-- **Prompt**: by default, the full conversation is summarized into a standalone recurring prompt via LLM on save. Toggle off **AI summary** to write the prompt manually.
+- **Prompt**: by default, the full conversation is summarized into a standalone recurring prompt via LLM on save (see [Schedule Conversion built-in agent](/docs/platform-built-in-agents-schedule-conversion) for where that LLM and prompt are configured). Toggle off **AI summary** to write the prompt manually.
 
 Agents can also trigger this conversion through the Archestra MCP tool `convert_conversation_to_scheduled_task` — for example, saying "save this as a weekday 9am task" in chat.
 
