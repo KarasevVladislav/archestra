@@ -2,6 +2,7 @@ import {
   BUILT_IN_AGENT_IDS,
   BUILT_IN_AGENT_NAMES,
   POLICY_CONFIG_SYSTEM_PROMPT,
+  SCHEDULE_CONVERSION_SYSTEM_PROMPT,
 } from "@shared";
 import db, { schema } from "@/database";
 import AgentModel from "@/models/agent";
@@ -17,16 +18,24 @@ describe("syncBuiltInAgents", () => {
 
     await syncBuiltInAgents();
 
-    const [firstPolicyAgent, secondPolicyAgent] = await Promise.all([
-      AgentModel.getBuiltInAgent(BUILT_IN_AGENT_IDS.POLICY_CONFIG, firstOrg.id),
-      AgentModel.getBuiltInAgent(
-        BUILT_IN_AGENT_IDS.POLICY_CONFIG,
-        secondOrg.id,
-      ),
-    ]);
+    const [firstPolicyAgent, secondPolicyAgent, firstScheduleConversion] =
+      await Promise.all([
+        AgentModel.getBuiltInAgent(BUILT_IN_AGENT_IDS.POLICY_CONFIG, firstOrg.id),
+        AgentModel.getBuiltInAgent(
+          BUILT_IN_AGENT_IDS.POLICY_CONFIG,
+          secondOrg.id,
+        ),
+        AgentModel.getBuiltInAgent(
+          BUILT_IN_AGENT_IDS.SCHEDULE_CONVERSION,
+          firstOrg.id,
+        ),
+      ]);
 
     expect(firstPolicyAgent).not.toBeNull();
     expect(secondPolicyAgent).not.toBeNull();
+    expect(firstScheduleConversion?.systemPrompt).toBe(
+      SCHEDULE_CONVERSION_SYSTEM_PROMPT,
+    );
   });
 
   test("updates legacy policy configuration system prompts", async ({

@@ -1,6 +1,7 @@
+import { and, eq, sql } from "drizzle-orm";
+import type { A2AExecuteResult } from "@/agents/a2a-executor";
 import { executeA2AMessage } from "@/agents/a2a-executor";
 import { hasAnyAgentTypeAdminPermission } from "@/auth";
-import { and, eq, sql } from "drizzle-orm";
 import db, { schema } from "@/database";
 import logger from "@/logging";
 import {
@@ -112,144 +113,26 @@ export async function handleScheduleTriggerRunExecution(
       scheduleTriggerRunId: run.id,
     });
 
-    if (
-      status === "success" &&
-      trigger.keepResultsInSameChat &&
-      !linkedConversationId
-    ) {
-      const llmSelection = await resolveConversationLlmSelectionForAgent({
-        agent: {
-          llmApiKeyId: triggerAgent.llmApiKeyId ?? null,
-          llmModel: triggerAgent.llmModel ?? null,
-        },
-        organizationId: trigger.organizationId,
-        userId: actor.id,
+    linkedConversationId =
+      await ensureLinkedConversationForKeepResultsInSameChat({
+        runStatus: status,
+        trigger,
+        triggerAgent,
+        actor,
+        linkedConversationId,
       });
-
-      linkedConversationId = await db.transaction(async (tx) => {
-        await tx.execute(
-          sql`SELECT pg_advisory_xact_lock(hashtextextended(${trigger.id}, 0))`,
-        );
-
-        const [fresh] = await tx
-          .select({
-            linkedConversationId: schema.scheduleTriggersTable.linkedConversationId,
-          })
-          .from(schema.scheduleTriggersTable)
-          .where(
-            and(
-              eq(schema.scheduleTriggersTable.id, trigger.id),
-              eq(
-                schema.scheduleTriggersTable.organizationId,
-                trigger.organizationId,
-              ),
-            ),
-          )
-          .limit(1);
-
-        if (fresh?.linkedConversationId) {
-          return fresh.linkedConversationId;
-        }
-
-        const titleBase = trigger.name?.trim() || "Scheduled task";
-        const title =
-          titleBase.length > 80 ? `${titleBase.slice(0, 77).trimEnd()}...` : titleBase;
-
-        const [conversation] = await tx
-          .insert(schema.conversationsTable)
-          .values({
-            userId: actor.id,
-            organizationId: trigger.organizationId,
-            agentId: trigger.agentId,
-            title,
-            selectedModel: llmSelection.selectedModel,
-            selectedProvider: llmSelection.selectedProvider,
-            chatApiKeyId: llmSelection.chatApiKeyId,
-          })
-          .returning({ id: schema.conversationsTable.id });
-
-        if (!conversation?.id) {
-          throw new Error("Failed to create linked conversation for schedule trigger");
-        }
-
-        await tx
-          .update(schema.scheduleTriggersTable)
-          .set({ linkedConversationId: conversation.id })
-          .where(eq(schema.scheduleTriggersTable.id, trigger.id));
-
-        return conversation.id;
-      });
-    }
 
     if (linkedConversationId) {
-      const linkedAgentValid =
-        await scheduleTriggerConverterService.isAgentValidForLinkedConversation(
-          {
-            linkedConversationId,
-            agentId: trigger.agentId,
-            actorUserId: actor.id,
-            organizationId: trigger.organizationId,
-          },
-        );
-
-      if (!linkedAgentValid) {
-        logger.warn(
-          {
-            runId: run.id,
-            triggerId: run.triggerId,
-            linkedConversationId,
-            agentId: trigger.agentId,
-          },
-          "Schedule trigger linked conversation no longer accepts the trigger agent; auto-healing by clearing linkedConversationId",
-        );
-
-        try {
-          await ScheduleTriggerModel.update(trigger.id, {
-            linkedConversationId: null,
-          });
-        } catch (healError) {
-          logger.error(
-            {
-              runId: run.id,
-              triggerId: run.triggerId,
-              error:
-                healError instanceof Error
-                  ? healError.message
-                  : String(healError),
-            },
-            "Failed to auto-heal schedule trigger linked conversation binding",
-          );
-        }
-
-        errorMessage = LINKED_CONVERSATION_AUTO_HEAL_WARNING;
-      } else {
-        try {
-          await appendLinkedScheduleRunMessagesToConversation({
-            conversationId: linkedConversationId,
-            messageTemplate: resolvedMessage,
-            assistantText: result.text,
-          });
-          await ScheduleTriggerRunModel.setChatConversationId(
-            run.id,
-            linkedConversationId,
-          );
-          await websocketService.notifyConversationMessagesUpdated({
-            conversationId: linkedConversationId,
-          });
-        } catch (syncError) {
-          logger.error(
-            {
-              runId: run.id,
-              triggerId: run.triggerId,
-              linkedConversationId,
-              error:
-                syncError instanceof Error
-                  ? syncError.message
-                  : String(syncError),
-            },
-            "Schedule trigger run succeeded but failed to sync messages to linked conversation",
-          );
-        }
+      const { healWarning } = await syncScheduleTriggerRunToLinkedConversation({
+        run,
+        trigger,
+        actorUserId: actor.id,
+        linkedConversationId,
+        resolvedMessage,
+        result,
+      });
+      if (healWarning) {
+        errorMessage = healWarning;
       }
     }
   } catch (error) {
@@ -290,4 +173,205 @@ function formatScheduleTriggerExecutionError(errorMessage: string): string {
   }
 
   return `${errorMessage} Scheduled triggers need a different chat-capable model for this agent. Pick a model that supports standard text and tool execution for scheduled runs, then try again.`;
+}
+
+interface ITriggerAgentLlmFields {
+  llmApiKeyId: string | null;
+  llmModel: string | null;
+}
+
+/** Narrow trigger shape used by linked-conversation helpers (avoids importing `@/types` in this module). */
+interface IScheduleTriggerLinkedConversationContext {
+  id: string;
+  organizationId: string;
+  name: string | null;
+  agentId: string;
+  keepResultsInSameChat: boolean;
+}
+
+interface IScheduleTriggerRunRef {
+  id: string;
+  triggerId: string;
+}
+
+interface IEnsureLinkedConversationForKeepResultsInSameChatParams {
+  runStatus: "success" | "failed";
+  trigger: IScheduleTriggerLinkedConversationContext;
+  triggerAgent: ITriggerAgentLlmFields;
+  actor: { id: string };
+  linkedConversationId: string | null;
+}
+
+async function ensureLinkedConversationForKeepResultsInSameChat(
+  params: IEnsureLinkedConversationForKeepResultsInSameChatParams,
+): Promise<string | null> {
+  const { runStatus, trigger, triggerAgent, actor, linkedConversationId } =
+    params;
+
+  if (
+    runStatus !== "success" ||
+    !trigger.keepResultsInSameChat ||
+    linkedConversationId
+  ) {
+    return linkedConversationId;
+  }
+
+  const llmSelection = await resolveConversationLlmSelectionForAgent({
+    agent: {
+      llmApiKeyId: triggerAgent.llmApiKeyId ?? null,
+      llmModel: triggerAgent.llmModel ?? null,
+    },
+    organizationId: trigger.organizationId,
+    userId: actor.id,
+  });
+
+  return db.transaction(async (tx) => {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${trigger.id}, 0))`,
+    );
+
+    const [fresh] = await tx
+      .select({
+        linkedConversationId: schema.scheduleTriggersTable.linkedConversationId,
+      })
+      .from(schema.scheduleTriggersTable)
+      .where(
+        and(
+          eq(schema.scheduleTriggersTable.id, trigger.id),
+          eq(
+            schema.scheduleTriggersTable.organizationId,
+            trigger.organizationId,
+          ),
+        ),
+      )
+      .limit(1);
+
+    if (fresh?.linkedConversationId) {
+      return fresh.linkedConversationId;
+    }
+
+    const titleBase = trigger.name?.trim() || "Scheduled task";
+    const title =
+      titleBase.length > 80
+        ? `${titleBase.slice(0, 77).trimEnd()}...`
+        : titleBase;
+
+    const [conversation] = await tx
+      .insert(schema.conversationsTable)
+      .values({
+        userId: actor.id,
+        organizationId: trigger.organizationId,
+        agentId: trigger.agentId,
+        title,
+        selectedModel: llmSelection.selectedModel,
+        selectedProvider: llmSelection.selectedProvider,
+        chatApiKeyId: llmSelection.chatApiKeyId,
+      })
+      .returning({ id: schema.conversationsTable.id });
+
+    if (!conversation?.id) {
+      throw new Error(
+        "Failed to create linked conversation for schedule trigger",
+      );
+    }
+
+    await tx
+      .update(schema.scheduleTriggersTable)
+      .set({ linkedConversationId: conversation.id })
+      .where(eq(schema.scheduleTriggersTable.id, trigger.id));
+
+    return conversation.id;
+  });
+}
+
+interface ISyncScheduleTriggerRunToLinkedConversationParams {
+  run: IScheduleTriggerRunRef;
+  trigger: IScheduleTriggerLinkedConversationContext;
+  actorUserId: string;
+  linkedConversationId: string;
+  resolvedMessage: string;
+  result: A2AExecuteResult;
+}
+
+interface ISyncScheduleTriggerRunToLinkedConversationResult {
+  healWarning?: string;
+}
+
+async function syncScheduleTriggerRunToLinkedConversation(
+  params: ISyncScheduleTriggerRunToLinkedConversationParams,
+): Promise<ISyncScheduleTriggerRunToLinkedConversationResult> {
+  const {
+    run,
+    trigger,
+    actorUserId,
+    linkedConversationId,
+    resolvedMessage,
+    result,
+  } = params;
+
+  const linkedAgentValid =
+    await scheduleTriggerConverterService.isAgentValidForLinkedConversation({
+      linkedConversationId,
+      agentId: trigger.agentId,
+      actorUserId,
+      organizationId: trigger.organizationId,
+    });
+
+  if (!linkedAgentValid) {
+    logger.warn(
+      {
+        runId: run.id,
+        triggerId: run.triggerId,
+        linkedConversationId,
+        agentId: trigger.agentId,
+      },
+      "Schedule trigger linked conversation no longer accepts the trigger agent; auto-healing by clearing linkedConversationId",
+    );
+
+    try {
+      await ScheduleTriggerModel.update(trigger.id, {
+        linkedConversationId: null,
+      });
+    } catch (healError) {
+      logger.error(
+        {
+          runId: run.id,
+          triggerId: run.triggerId,
+          error:
+            healError instanceof Error ? healError.message : String(healError),
+        },
+        "Failed to auto-heal schedule trigger linked conversation binding",
+      );
+    }
+
+    return { healWarning: LINKED_CONVERSATION_AUTO_HEAL_WARNING };
+  }
+
+  try {
+    await appendLinkedScheduleRunMessagesToConversation({
+      conversationId: linkedConversationId,
+      messageTemplate: resolvedMessage,
+      assistantText: result.text,
+    });
+    await ScheduleTriggerRunModel.setChatConversationId(
+      run.id,
+      linkedConversationId,
+    );
+    await websocketService.notifyConversationMessagesUpdated({
+      conversationId: linkedConversationId,
+    });
+  } catch (syncError) {
+    logger.error(
+      {
+        runId: run.id,
+        triggerId: run.triggerId,
+        linkedConversationId,
+        error:
+          syncError instanceof Error ? syncError.message : String(syncError),
+      },
+      "Schedule trigger run succeeded but failed to sync messages to linked conversation",
+    );
+  }
+
+  return {};
 }

@@ -1058,6 +1058,7 @@ class AgentModel {
         scope: AgentScope;
         authorId: string | null;
         teamIds: string[];
+        organizationId: string;
       }
     >
   > {
@@ -1072,6 +1073,7 @@ class AgentModel {
           agentType: schema.agentsTable.agentType,
           scope: schema.agentsTable.scope,
           authorId: schema.agentsTable.authorId,
+          organizationId: schema.agentsTable.organizationId,
         })
         .from(schema.agentsTable)
         .where(inArray(schema.agentsTable.id, ids)),
@@ -1085,6 +1087,7 @@ class AgentModel {
         scope: AgentScope;
         authorId: string | null;
         teamIds: string[];
+        organizationId: string;
       }
     >();
     for (const agent of agents) {
@@ -1094,10 +1097,86 @@ class AgentModel {
         scope: agent.scope,
         authorId: agent.authorId,
         teamIds: teams.map((t) => t.id),
+        organizationId: agent.organizationId,
       });
     }
 
     return result;
+  }
+
+  static async filterAgentIdsUserHasAccess(params: {
+    userId: string;
+    organizationId: string;
+    agentIds: string[];
+    isAgentAdmin: boolean;
+  }): Promise<Set<string>> {
+    const { userId, organizationId, agentIds, isAgentAdmin } = params;
+    const orderedUnique: string[] = [];
+    const seen = new Set<string>();
+    for (const id of agentIds) {
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      orderedUnique.push(id);
+    }
+    if (orderedUnique.length === 0) {
+      return new Set();
+    }
+
+    const contexts =
+      await AgentModel.findByIdsForPermissionCheck(orderedUnique);
+
+    if (isAgentAdmin) {
+      const out = new Set<string>();
+      for (const id of orderedUnique) {
+        const ctx = contexts.get(id);
+        if (
+          ctx &&
+          ctx.agentType === "agent" &&
+          ctx.organizationId === organizationId
+        ) {
+          out.add(id);
+        }
+      }
+      return out;
+    }
+
+    const userTeams = await db
+      .select({ teamId: schema.teamMembersTable.teamId })
+      .from(schema.teamMembersTable)
+      .where(eq(schema.teamMembersTable.userId, userId));
+    const userTeamSet = new Set(userTeams.map((t) => t.teamId));
+
+    const out = new Set<string>();
+    for (const id of orderedUnique) {
+      const ctx = contexts.get(id);
+      if (
+        !ctx ||
+        ctx.agentType !== "agent" ||
+        ctx.organizationId !== organizationId
+      ) {
+        continue;
+      }
+      if (ctx.scope === "org") {
+        out.add(id);
+        continue;
+      }
+      if (ctx.scope === "personal") {
+        if (ctx.authorId === userId) {
+          out.add(id);
+        }
+        continue;
+      }
+      if (ctx.scope === "team") {
+        if (userTeamSet.size === 0) {
+          continue;
+        }
+        if (ctx.teamIds.some((tid) => userTeamSet.has(tid))) {
+          out.add(id);
+        }
+      }
+    }
+
+    return out;
   }
 
   /**

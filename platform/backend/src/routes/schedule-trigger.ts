@@ -1,5 +1,6 @@
 import type { IncomingHttpHeaders } from "node:http";
 import {
+  CreateScheduleTriggerFromConversationBodySchema,
   calculatePaginationMeta,
   createPaginatedResponseSchema,
   DynamicInteraction,
@@ -20,8 +21,8 @@ import {
   ScheduleTriggerModel,
   ScheduleTriggerRunModel,
 } from "@/models";
-import { taskQueueService } from "@/task-queue";
 import { scheduleTriggerConverterService } from "@/schedule-triggers/converter";
+import { taskQueueService } from "@/task-queue";
 import {
   ApiError,
   constructResponseSchema,
@@ -61,45 +62,34 @@ const CreateScheduleTriggerBodySchema =
     }
   });
 
-const CreateScheduleTriggerFromConversationBodySchema = z.object({
-  conversationId: UuidIdSchema,
-  cronExpression: z.string().min(1),
-  timezone: z.string().min(1),
-  name: z.string().min(1).optional(),
-  messageTemplate: z.string().min(1).optional(),
-  agentId: UuidIdSchema.optional(),
-  enabled: z.boolean().optional(),
-  replyInSameConversation: z.boolean().optional(),
-});
-
 const UpdateScheduleTriggerBodySchema =
   ScheduleTriggerBodyFieldsSchema.partial()
     .extend({
       linkedConversationId: z.union([UuidIdSchema, z.null()]).optional(),
     })
     .superRefine((data, ctx) => {
-    if (Object.keys(data).length === 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "At least one field must be provided",
-      });
-      return;
-    }
+      if (Object.keys(data).length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "At least one field must be provided",
+        });
+        return;
+      }
 
-    const result =
-      ScheduleTriggerConfigurationSchemaBase.partial().safeParse(data);
-    if (result.success) {
-      return;
-    }
+      const result =
+        ScheduleTriggerConfigurationSchemaBase.partial().safeParse(data);
+      if (result.success) {
+        return;
+      }
 
-    for (const issue of result.error.issues) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: issue.message,
-        path: issue.path,
-      });
-    }
-  });
+      for (const issue of result.error.issues) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: issue.message,
+          path: issue.path,
+        });
+      }
+    });
 
 const scheduleTriggerRoutes: FastifyPluginAsyncZod = async (fastify) => {
   fastify.get(
@@ -272,18 +262,19 @@ const scheduleTriggerRoutes: FastifyPluginAsyncZod = async (fastify) => {
       },
     },
     async ({ body, user, organizationId }, reply) => {
-      const trigger = await scheduleTriggerConverterService.createFromConversation({
-        conversationId: body.conversationId,
-        userId: user.id,
-        organizationId,
-        cronExpression: body.cronExpression,
-        timezone: body.timezone,
-        name: body.name,
-        messageTemplate: body.messageTemplate,
-        agentId: body.agentId,
-        enabled: body.enabled,
-        replyInSameConversation: body.replyInSameConversation,
-      });
+      const trigger =
+        await scheduleTriggerConverterService.createFromConversation({
+          conversationId: body.conversationId,
+          userId: user.id,
+          organizationId,
+          cronExpression: body.cronExpression,
+          timezone: body.timezone,
+          name: body.name,
+          messageTemplate: body.messageTemplate,
+          agentId: body.agentId,
+          enabled: body.enabled,
+          replyInSameConversation: body.replyInSameConversation,
+        });
 
       return reply.send(trigger);
     },
@@ -295,7 +286,7 @@ const scheduleTriggerRoutes: FastifyPluginAsyncZod = async (fastify) => {
       schema: {
         operationId: RouteId.GetConversationScheduleTriggerSuggestion,
         description:
-          "Suggest defaults (agent, name, prompt preview) for converting a conversation into a scheduled task.",
+          "Suggest defaults (agent, name, editable message template from conversation summary, first-message preview) for converting a conversation into a scheduled task.",
         tags: ["Schedule Triggers"],
         params: z.object({ id: UuidIdSchema }),
         response: constructResponseSchema(ScheduleTriggerSuggestionSchema),

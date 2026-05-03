@@ -643,6 +643,8 @@ export function AgentDialog({
     builtInAgentName === BUILT_IN_AGENT_IDS.DUAL_LLM_MAIN;
   const isDualLlmQuarantineBuiltIn =
     builtInAgentName === BUILT_IN_AGENT_IDS.DUAL_LLM_QUARANTINE;
+  const isScheduleConversionBuiltIn =
+    builtInAgentName === BUILT_IN_AGENT_IDS.SCHEDULE_CONVERSION;
   const _isDualLlmBuiltIn = isDualLlmMainBuiltIn || isDualLlmQuarantineBuiltIn;
   const supportsIdentityProvider =
     agentType === "mcp_gateway" || agentType === "llm_proxy";
@@ -924,9 +926,13 @@ export function AgentDialog({
                 name: BUILT_IN_AGENT_IDS.DUAL_LLM_MAIN,
                 maxRounds: parsedDualLlmMaxRounds,
               }
-            : {
-                name: BUILT_IN_AGENT_IDS.DUAL_LLM_QUARANTINE,
-              };
+            : isScheduleConversionBuiltIn
+              ? {
+                  name: BUILT_IN_AGENT_IDS.SCHEDULE_CONVERSION,
+                }
+              : {
+                  name: BUILT_IN_AGENT_IDS.DUAL_LLM_QUARANTINE,
+                };
 
         const updated = await updateAgent.mutateAsync({
           id: agent.id,
@@ -1096,6 +1102,7 @@ export function AgentDialog({
     isDualLlmMainBuiltIn,
     isInternalAgent,
     isPolicyConfigBuiltIn,
+    isScheduleConversionBuiltIn,
     showSecurity,
     isAdmin,
     selectedDelegationTargetIds,
@@ -1138,7 +1145,10 @@ export function AgentDialog({
                   {agent.description}.{" "}
                   <ExternalDocsLink
                     href={getDocsUrl(
-                      DocsPage.PlatformBuiltInAgentsPolicyConfig,
+                      builtInAgentName ===
+                        BUILT_IN_AGENT_IDS.SCHEDULE_CONVERSION
+                        ? DocsPage.PlatformBuiltInAgentsScheduleConversion
+                        : DocsPage.PlatformBuiltInAgentsPolicyConfig,
                     )}
                     className="underline"
                     showIcon={false}

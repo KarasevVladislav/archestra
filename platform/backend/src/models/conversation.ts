@@ -334,6 +334,23 @@ class ConversationModel {
     };
   }
 
+  static async getNotifyMetadataById(conversationId: string): Promise<{
+    id: string;
+    organizationId: string;
+    ownerUserId: string;
+  } | null> {
+    const [row] = await db
+      .select({
+        id: schema.conversationsTable.id,
+        organizationId: schema.conversationsTable.organizationId,
+        ownerUserId: schema.conversationsTable.userId,
+      })
+      .from(schema.conversationsTable)
+      .where(eq(schema.conversationsTable.id, conversationId))
+      .limit(1);
+    return row ?? null;
+  }
+
   static async findAccessibleById(params: {
     id: string;
     userId: string;

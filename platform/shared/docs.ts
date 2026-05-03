@@ -20,6 +20,8 @@ export const DocsPage = {
   PlatformArchestraMcpServer: "platform-archestra-mcp-server",
   PlatformApiReference: "platform-api-reference",
   PlatformBuiltInAgentsPolicyConfig: "platform-built-in-agents-policy-config",
+  PlatformBuiltInAgentsScheduleConversion:
+    "platform-built-in-agents-schedule-conversion",
   PlatformChat: "platform-chat",
   PlatformCostsAndLimits: "platform-costs-and-limits",
   PlatformDeployment: "platform-deployment",

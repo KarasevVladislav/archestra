@@ -43,8 +43,8 @@ vi.mock("@/components/scheduled-tasks/schedule-trigger-form-dialog", () => ({
 
 const mockUseConversationScheduleTriggerSuggestion = vi.fn();
 vi.mock("@/lib/schedule-trigger.query", () => ({
-  useConversationScheduleTriggerSuggestion: (...args: unknown[]) =>
-    mockUseConversationScheduleTriggerSuggestion(...args),
+  useConversationScheduleTriggerSuggestion: () =>
+    mockUseConversationScheduleTriggerSuggestion(),
   useCreateScheduleTriggerFromConversation: () => ({
     mutateAsync: vi.fn(),
     reset: vi.fn(),
@@ -128,8 +128,10 @@ describe("ConvertToScheduledTaskDialog — reply-in-same-conversation", () => {
         ],
         reason: "current-conversation-agent",
         suggestedName: "Daily digest",
+        suggestedMessageTemplate: "",
         suggestedMessageTemplatePreview: "",
       },
+      isPending: false,
     });
 
     renderDialog();
@@ -176,8 +178,10 @@ describe("ConvertToScheduledTaskDialog — reply-in-same-conversation", () => {
         ],
         reason: "current-conversation-agent",
         suggestedName: "Daily digest",
+        suggestedMessageTemplate: "",
         suggestedMessageTemplatePreview: "",
       },
+      isPending: false,
     });
 
     renderDialog();
@@ -209,8 +213,10 @@ describe("ConvertToScheduledTaskDialog — reply-in-same-conversation", () => {
         candidates: [],
         reason: "none",
         suggestedName: "Daily digest",
+        suggestedMessageTemplate: "",
         suggestedMessageTemplatePreview: "",
       },
+      isPending: false,
     });
 
     renderDialog();

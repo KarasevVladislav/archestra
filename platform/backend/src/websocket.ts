@@ -8,7 +8,7 @@ import {
   type McpDeploymentStatusEntry,
   type ServerWebSocketMessage,
 } from "@shared";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, inArray } from "drizzle-orm";
 import type { WebSocket, WebSocketServer } from "ws";
 import { WebSocket as WS, WebSocketServer as WSS } from "ws";
 import { betterAuth, hasPermission } from "@/auth";
@@ -18,6 +18,7 @@ import { BrowserStreamSocketClientContext } from "@/features/browser-stream/webs
 import McpServerRuntimeManager from "@/k8s/mcp-server-runtime/manager";
 import logger from "@/logging";
 import { McpServerModel, UserModel } from "@/models";
+import ConversationModel from "@/models/conversation";
 import ConversationShareModel from "@/models/conversation-share";
 import { reportMcpDeploymentStatuses } from "@/observability/metrics/mcp";
 
@@ -804,16 +805,9 @@ class WebSocketService {
         ownerUserId: params.ownerUserId,
       };
     } else {
-      const [row] = await db
-        .select({
-          id: schema.conversationsTable.id,
-          organizationId: schema.conversationsTable.organizationId,
-          ownerUserId: schema.conversationsTable.userId,
-        })
-        .from(schema.conversationsTable)
-        .where(eq(schema.conversationsTable.id, params.conversationId))
-        .limit(1);
-      conversation = row ?? null;
+      conversation = await ConversationModel.getNotifyMetadataById(
+        params.conversationId,
+      );
     }
 
     if (!conversation) {
@@ -883,7 +877,9 @@ class WebSocketService {
 
     this.sendToClients(message, (client) => {
       const ctx = this.clientContexts.get(client);
-      return inOrg(client) && ctx !== undefined && allowedUserIds.has(ctx.userId);
+      return (
+        inOrg(client) && ctx !== undefined && allowedUserIds.has(ctx.userId)
+      );
     });
   }
 

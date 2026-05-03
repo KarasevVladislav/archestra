@@ -18,7 +18,7 @@ describe("ScheduleTriggerFormDialog", () => {
         values={{
           name: "",
           agentId: "",
-          cronExpression: "0 9 * * 1-5",
+          cronExpression: "0 9 * * 1,2,3,4,5",
           timezone: "UTC",
           messageTemplate: "",
         }}
@@ -52,7 +52,7 @@ describe("ScheduleTriggerFormDialog", () => {
         values={{
           name: "Test",
           agentId: "agent-1",
-          cronExpression: "0 9 * * 1-5",
+          cronExpression: "0 9 * * 1,2,3,4,5",
           timezone: "UTC",
           messageTemplate: "Do it",
         }}
@@ -74,6 +74,38 @@ describe("ScheduleTriggerFormDialog", () => {
     await user.click(screen.getByRole("button", { name: "Create" }));
 
     expect(onSubmit).toHaveBeenCalledOnce();
+  });
+
+  it("renders custom prompt label", () => {
+    render(
+      <ScheduleTriggerFormDialog
+        open
+        onOpenChange={vi.fn()}
+        title="New task"
+        values={{
+          name: "Test",
+          agentId: "agent-1",
+          cronExpression: "0 9 * * 1,2,3,4,5",
+          timezone: "UTC",
+          messageTemplate: "Hi",
+        }}
+        agentOptions={[{ value: "agent-1", label: "Agent" }]}
+        agentsLoading={false}
+        hasAgents
+        isSaving={false}
+        isFormValid
+        permissions={{ scheduledTask: ["create"] }}
+        submitLabel="Create"
+        onSubmit={vi.fn()}
+        onNameChange={vi.fn()}
+        onAgentChange={vi.fn()}
+        onCronExpressionChange={vi.fn()}
+        onMessageTemplateChange={vi.fn()}
+        promptLabel="Summary"
+      />,
+    );
+
+    expect(screen.getByText("Summary")).toBeInTheDocument();
   });
 });
 

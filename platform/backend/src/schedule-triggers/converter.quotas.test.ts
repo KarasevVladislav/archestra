@@ -28,6 +28,7 @@ import LimitModel, { LimitValidationService } from "@/models/limit";
 import MessageModel from "@/models/message";
 import { beforeEach, describe, expect, test } from "@/test";
 import { scheduleTriggerConverterService } from "./converter";
+import { configureScheduleConversionBuiltInForTests } from "./testing/configure-schedule-conversion-built-in";
 
 describe("scheduleTriggerConverterService quota / limit integration", () => {
   beforeEach(() => {
@@ -45,6 +46,10 @@ describe("scheduleTriggerConverterService quota / limit integration", () => {
   }) => {
     const user = await makeUser();
     const org = await makeOrganization();
+    await configureScheduleConversionBuiltInForTests({
+      organizationId: org.id,
+      llmModel: "gpt-4o",
+    });
     const agent = await makeInternalAgent({
       organizationId: org.id,
       llmModel: "gpt-4o",
@@ -95,6 +100,10 @@ describe("scheduleTriggerConverterService quota / limit integration", () => {
   }) => {
     const user = await makeUser();
     const org = await makeOrganization();
+    const { builtInId } = await configureScheduleConversionBuiltInForTests({
+      organizationId: org.id,
+      llmModel: "gpt-4o",
+    });
     const agent = await makeInternalAgent({
       organizationId: org.id,
       llmModel: "gpt-4o",
@@ -139,7 +148,13 @@ describe("scheduleTriggerConverterService quota / limit integration", () => {
 
     expect(mockGenerateText).toHaveBeenCalled();
     expect(trigger.messageTemplate).toBe("LLM summarized standalone prompt");
-    expect(updateSpy).toHaveBeenCalledWith("agent", agent.id, "gpt-4o", 10, 5);
+    expect(updateSpy).toHaveBeenCalledWith(
+      "agent",
+      builtInId,
+      "gpt-4o",
+      10,
+      5,
+    );
   });
 
   test("still returns summarized prompt when updateTokenLimitUsage fails", async ({
@@ -149,6 +164,10 @@ describe("scheduleTriggerConverterService quota / limit integration", () => {
   }) => {
     const user = await makeUser();
     const org = await makeOrganization();
+    await configureScheduleConversionBuiltInForTests({
+      organizationId: org.id,
+      llmModel: "gpt-4o",
+    });
     const agent = await makeInternalAgent({
       organizationId: org.id,
       llmModel: "gpt-4o",

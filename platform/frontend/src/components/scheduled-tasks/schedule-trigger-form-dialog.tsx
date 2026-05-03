@@ -2,7 +2,7 @@
 
 import { Cron } from "croner";
 import type React from "react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -66,9 +66,12 @@ export function ScheduleTriggerFormDialog({
   onMessageTemplateChange,
   showTimezone,
   showEnabled,
+  promptLabel = "Task Prompt",
+  promptDescription,
   promptHeaderExtra,
   promptPlaceholder,
   promptBody,
+  promptLoading = false,
   agentSelectDisabled,
   agentSelectHelpText,
   postEnabledSection,
@@ -93,9 +96,12 @@ export function ScheduleTriggerFormDialog({
   onMessageTemplateChange: (value: string) => void;
   showTimezone?: boolean;
   showEnabled?: boolean;
+  promptLabel?: string;
+  promptDescription?: React.ReactNode;
   promptHeaderExtra?: React.ReactNode;
   promptPlaceholder?: string;
   promptBody?: React.ReactNode;
+  promptLoading?: boolean;
   agentSelectDisabled?: boolean;
   agentSelectHelpText?: string;
   postEnabledSection?: React.ReactNode;
@@ -139,16 +145,23 @@ export function ScheduleTriggerFormDialog({
 
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-3">
-                <Label htmlFor="dialog-prompt">Task Prompt</Label>
+                <Label htmlFor="dialog-prompt">{promptLabel}</Label>
                 {promptHeaderExtra}
               </div>
+              {promptDescription ? (
+                <div className="text-xs text-muted-foreground">{promptDescription}</div>
+              ) : null}
               {promptBody ?? (
                 <Textarea
                   id="dialog-prompt"
                   value={values.messageTemplate}
                   onChange={(event) => onMessageTemplateChange(event.target.value)}
+                  disabled={promptLoading}
                   placeholder={
-                    promptPlaceholder ?? "Ask the agent to do something on every run."
+                    promptLoading
+                      ? "Generating summary…"
+                      : (promptPlaceholder ??
+                        "Ask the agent to do something on every run.")
                   }
                   className="min-h-[80px] resize-y"
                 />
@@ -257,7 +270,12 @@ function parseCronToMode(cron: string): {
   const [min, hr, , , dow] = parts;
 
   if (hr === "*" && dow === "*") {
-    return { mode: "hourly", ...defaults };
+    return {
+      mode: "hourly",
+      hour: defaults.hour,
+      minute: min,
+      days: defaults.days,
+    };
   }
 
   if (hr !== "*" && !hr.includes("/")) {
@@ -314,6 +332,18 @@ function ScheduleSection({
   const [hour, setHour] = useState(parsed.hour);
   const [minute] = useState(parsed.minute);
   const [days, setDays] = useState<number[]>(parsed.days);
+
+  useEffect(() => {
+    const canonical = buildCronFromSchedule(
+      parsed.mode,
+      parsed.hour,
+      parsed.minute,
+      parsed.days,
+    );
+    if (canonical !== cronExpression.trim()) {
+      onCronExpressionChange(canonical);
+    }
+  }, [parsed, cronExpression, onCronExpressionChange]);
 
   const updateCron = useCallback(
     (newMode: ScheduleMode, newHour: string, newMinute: string, newDays: number[]) => {

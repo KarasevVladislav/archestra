@@ -75,11 +75,16 @@ const DualLlmQuarantineAgentConfigSchema = z.object({
   name: z.literal(BUILT_IN_AGENT_IDS.DUAL_LLM_QUARANTINE),
 });
 
+const ScheduleConversionAgentConfigSchema = z.object({
+  name: z.literal(BUILT_IN_AGENT_IDS.SCHEDULE_CONVERSION),
+});
+
 // Discriminated union — add future built-in agents here
 export const BuiltInAgentConfigSchema = z.discriminatedUnion("name", [
   PolicyConfigAgentConfigSchema,
   DualLlmMainAgentConfigSchema,
   DualLlmQuarantineAgentConfigSchema,
+  ScheduleConversionAgentConfigSchema,
 ]);
 
 export type BuiltInAgentConfig = z.infer<typeof BuiltInAgentConfigSchema>;
@@ -91,6 +96,9 @@ export type DualLlmMainAgentConfig = z.infer<
 >;
 export type DualLlmQuarantineAgentConfig = z.infer<
   typeof DualLlmQuarantineAgentConfigSchema
+>;
+export type ScheduleConversionAgentConfig = z.infer<
+  typeof ScheduleConversionAgentConfigSchema
 >;
 
 // Team info schema for agent responses (just id and name)

@@ -10750,6 +10750,8 @@ export type GetAgentsResponses = {
                 maxRounds: number;
             } | {
                 name: 'dual-llm-quarantine-agent';
+            } | {
+                name: 'schedule-conversion-subagent';
             } | null;
             builtIn: boolean | null;
             createdAt: string;
@@ -10845,6 +10847,8 @@ export type CreateAgentData = {
             maxRounds: number;
         } | {
             name: 'dual-llm-quarantine-agent';
+        } | {
+            name: 'schedule-conversion-subagent';
         } | null;
         teams?: Array<string>;
         labels?: Array<{
@@ -10965,6 +10969,8 @@ export type CreateAgentResponses = {
             maxRounds: number;
         } | {
             name: 'dual-llm-quarantine-agent';
+        } | {
+            name: 'schedule-conversion-subagent';
         } | null;
         builtIn: boolean | null;
         createdAt: string;
@@ -11147,6 +11153,8 @@ export type GetAllAgentsResponses = {
             maxRounds: number;
         } | {
             name: 'dual-llm-quarantine-agent';
+        } | {
+            name: 'schedule-conversion-subagent';
         } | null;
         builtIn: boolean | null;
         createdAt: string;
@@ -11312,6 +11320,8 @@ export type GetDefaultMcpGatewayResponses = {
             maxRounds: number;
         } | {
             name: 'dual-llm-quarantine-agent';
+        } | {
+            name: 'schedule-conversion-subagent';
         } | null;
         builtIn: boolean | null;
         createdAt: string;
@@ -11477,6 +11487,8 @@ export type GetDefaultLlmProxyResponses = {
             maxRounds: number;
         } | {
             name: 'dual-llm-quarantine-agent';
+        } | {
+            name: 'schedule-conversion-subagent';
         } | null;
         builtIn: boolean | null;
         createdAt: string;
@@ -11729,6 +11741,8 @@ export type GetAgentResponses = {
             maxRounds: number;
         } | {
             name: 'dual-llm-quarantine-agent';
+        } | {
+            name: 'schedule-conversion-subagent';
         } | null;
         builtIn: boolean | null;
         createdAt: string;
@@ -11815,6 +11829,8 @@ export type UpdateAgentData = {
             maxRounds: number;
         } | {
             name: 'dual-llm-quarantine-agent';
+        } | {
+            name: 'schedule-conversion-subagent';
         } | null;
         teams?: Array<string>;
         labels?: Array<{
@@ -11937,6 +11953,8 @@ export type UpdateAgentResponses = {
             maxRounds: number;
         } | {
             name: 'dual-llm-quarantine-agent';
+        } | {
+            name: 'schedule-conversion-subagent';
         } | null;
         builtIn: boolean | null;
         createdAt: string;
@@ -38824,6 +38842,7 @@ export type GetScheduleTriggersResponses = {
             cronExpression: string;
             timezone: string;
             enabled: boolean;
+            keepResultsInSameChat: boolean;
             actorUserId: string;
             lastExecutedAt: string | null;
             createdAt: string;
@@ -38857,6 +38876,7 @@ export type CreateScheduleTriggerData = {
         name: string;
         agentId: string;
         enabled?: boolean;
+        keepResultsInSameChat?: boolean;
         cronExpression: string;
         timezone: string;
         messageTemplate: string;
@@ -38944,6 +38964,7 @@ export type CreateScheduleTriggerResponses = {
         cronExpression: string;
         timezone: string;
         enabled: boolean;
+        keepResultsInSameChat: boolean;
         actorUserId: string;
         lastExecutedAt: string | null;
         createdAt: string;
@@ -39057,6 +39078,7 @@ export type CreateScheduleTriggerFromConversationResponses = {
         cronExpression: string;
         timezone: string;
         enabled: boolean;
+        keepResultsInSameChat: boolean;
         actorUserId: string;
         lastExecutedAt: string | null;
         createdAt: string;
@@ -39167,6 +39189,7 @@ export type GetConversationScheduleTriggerSuggestionResponses = {
         }>;
         reason: 'explicit' | 'last-interaction' | 'current-conversation-agent' | 'member-default' | 'org-default' | 'none';
         suggestedName: string;
+        suggestedMessageTemplate: string;
         suggestedMessageTemplatePreview: string;
     };
 };
@@ -39345,6 +39368,7 @@ export type GetScheduleTriggerResponses = {
         cronExpression: string;
         timezone: string;
         enabled: boolean;
+        keepResultsInSameChat: boolean;
         actorUserId: string;
         lastExecutedAt: string | null;
         createdAt: string;
@@ -39369,6 +39393,7 @@ export type UpdateScheduleTriggerData = {
         name?: string;
         agentId?: string;
         enabled?: boolean;
+        keepResultsInSameChat?: boolean;
         cronExpression?: string;
         timezone?: string;
         messageTemplate?: string;
@@ -39459,6 +39484,7 @@ export type UpdateScheduleTriggerResponses = {
         cronExpression: string;
         timezone: string;
         enabled: boolean;
+        keepResultsInSameChat: boolean;
         actorUserId: string;
         lastExecutedAt: string | null;
         createdAt: string;
@@ -39565,6 +39591,7 @@ export type EnableScheduleTriggerResponses = {
         cronExpression: string;
         timezone: string;
         enabled: boolean;
+        keepResultsInSameChat: boolean;
         actorUserId: string;
         lastExecutedAt: string | null;
         createdAt: string;
@@ -39671,6 +39698,7 @@ export type DisableScheduleTriggerResponses = {
         cronExpression: string;
         timezone: string;
         enabled: boolean;
+        keepResultsInSameChat: boolean;
         actorUserId: string;
         lastExecutedAt: string | null;
         createdAt: string;

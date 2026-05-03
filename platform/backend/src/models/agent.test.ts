@@ -2460,6 +2460,7 @@ describe("AgentModel", () => {
       expect(entry?.agentType).toBe("profile");
       expect(entry?.scope).toBe("org");
       expect(entry?.authorId).toBe(user.id);
+      expect(entry?.organizationId).toBe(org.id);
       expect(entry?.teamIds).toEqual([team.id]);
     });
 
@@ -2548,6 +2549,51 @@ describe("AgentModel", () => {
       const result = await AgentModel.findByIdsForPermissionCheck([agent.id]);
 
       expect(result.get(agent.id)?.authorId).toBeNull();
+    });
+  });
+
+  describe("filterAgentIdsUserHasAccess", () => {
+    test("returns org internal agents for member in same org", async ({
+      makeUser,
+      makeOrganization,
+      makeInternalAgent,
+    }) => {
+      const user = await makeUser();
+      const org = await makeOrganization();
+      const a = await makeInternalAgent({ organizationId: org.id });
+      const b = await makeInternalAgent({ organizationId: org.id });
+
+      const set = await AgentModel.filterAgentIdsUserHasAccess({
+        userId: user.id,
+        organizationId: org.id,
+        agentIds: [a.id, b.id],
+        isAgentAdmin: false,
+      });
+
+      expect(set.has(a.id)).toBe(true);
+      expect(set.has(b.id)).toBe(true);
+    });
+
+    test("excludes agents from another organization", async ({
+      makeUser,
+      makeOrganization,
+      makeInternalAgent,
+    }) => {
+      const user = await makeUser();
+      const orgA = await makeOrganization();
+      const orgB = await makeOrganization();
+      const inA = await makeInternalAgent({ organizationId: orgA.id });
+      const inB = await makeInternalAgent({ organizationId: orgB.id });
+
+      const set = await AgentModel.filterAgentIdsUserHasAccess({
+        userId: user.id,
+        organizationId: orgA.id,
+        agentIds: [inA.id, inB.id],
+        isAgentAdmin: false,
+      });
+
+      expect(set.has(inA.id)).toBe(true);
+      expect(set.has(inB.id)).toBe(false);
     });
   });
 

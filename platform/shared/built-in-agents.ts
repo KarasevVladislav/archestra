@@ -9,6 +9,7 @@ export const BUILT_IN_AGENT_NAMES = {
   POLICY_CONFIG: "Policy Configuration Subagent",
   DUAL_LLM_MAIN: "Dual LLM Main Agent",
   DUAL_LLM_QUARANTINE: "Dual LLM Quarantine Agent",
+  SCHEDULE_CONVERSION: "Schedule Conversion Subagent",
 } as const;
 
 /** Discriminator values for builtInAgentConfig.name */
@@ -16,6 +17,7 @@ export const BUILT_IN_AGENT_IDS = {
   POLICY_CONFIG: "policy-configuration-subagent",
   DUAL_LLM_MAIN: "dual-llm-main-agent",
   DUAL_LLM_QUARANTINE: "dual-llm-quarantine-agent",
+  SCHEDULE_CONVERSION: "schedule-conversion-subagent",
 } as const;
 
 /** System prompt template for the policy configuration subagent.
@@ -118,9 +120,20 @@ Security rules:
 - If the data is ambiguous, choose the closest option
 - Prefer the final catch-all option when no earlier option fits exactly`;
 
+export const SCHEDULE_CONVERSION_SYSTEM_PROMPT = `You are compressing a chat transcript into a single standalone prompt that can be used to re-execute the same task on a recurring schedule.
+
+Rules:
+- Output only the prompt text. No preamble, no trailing commentary, no markdown headings.
+- Keep it concise but specific. Preserve concrete filters, identifiers, dates and entities mentioned by the user.
+- If the user referenced relative time phrases like "today", "yesterday", "last week", replace them with placeholders such as {{today}}, {{yesterday}}, {{last_week}} so they resolve at run time.
+- Describe the deliverable explicitly (e.g. "produce a markdown summary", "create a Linear issue", etc.).
+- Do not reference the fact that this came from a prior conversation.
+- Do not use XML tags, angle-bracket blocks, or hidden reasoning — only the final prompt text.`;
+
 /** Maps built-in agent IDs to their default system prompts for reset-to-default. */
 export const BUILT_IN_AGENT_DEFAULT_SYSTEM_PROMPTS: Record<string, string> = {
   [BUILT_IN_AGENT_IDS.POLICY_CONFIG]: POLICY_CONFIG_SYSTEM_PROMPT,
   [BUILT_IN_AGENT_IDS.DUAL_LLM_MAIN]: DUAL_LLM_MAIN_SYSTEM_PROMPT,
   [BUILT_IN_AGENT_IDS.DUAL_LLM_QUARANTINE]: DUAL_LLM_QUARANTINE_SYSTEM_PROMPT,
+  [BUILT_IN_AGENT_IDS.SCHEDULE_CONVERSION]: SCHEDULE_CONVERSION_SYSTEM_PROMPT,
 };

@@ -1,4 +1,8 @@
-import { BUILT_IN_AGENT_IDS, BUILT_IN_AGENT_NAMES } from "@shared";
+import {
+  BUILT_IN_AGENT_IDS,
+  BUILT_IN_AGENT_NAMES,
+  SCHEDULE_CONVERSION_SYSTEM_PROMPT,
+} from "@shared";
 import { vi } from "vitest";
 import { AgentModel } from "@/models";
 import type { FastifyInstanceWithZod } from "@/server";
@@ -42,6 +46,23 @@ describe("built-in agents routes", () => {
       builtInAgentConfig: {
         name: BUILT_IN_AGENT_IDS.POLICY_CONFIG,
         autoConfigureOnToolDiscovery: false,
+      },
+      teams: [],
+      labels: [],
+      knowledgeBaseIds: [],
+      connectorIds: [],
+    });
+
+    await AgentModel.create({
+      name: BUILT_IN_AGENT_NAMES.SCHEDULE_CONVERSION,
+      organizationId,
+      agentType: "agent",
+      scope: "org",
+      description:
+        "Built-in agent that summarizes chat transcripts into standalone prompts for recurring scheduled tasks",
+      systemPrompt: SCHEDULE_CONVERSION_SYSTEM_PROMPT,
+      builtInAgentConfig: {
+        name: BUILT_IN_AGENT_IDS.SCHEDULE_CONVERSION,
       },
       teams: [],
       labels: [],
@@ -142,6 +163,32 @@ describe("built-in agents routes", () => {
       url: `/api/agents/${builtIn.id}`,
     });
 
+    expect(deleteResponse.statusCode).toBe(403);
+  });
+
+  test("schedule conversion built-in agent exists and cannot be deleted", async () => {
+    const listResponse = await app.inject({
+      method: "GET",
+      url: "/api/agents?agentTypes=agent&scope=built_in&limit=100",
+    });
+    const listResult = listResponse.json();
+    const agents = listResult.data ?? listResult;
+    const scheduleBuiltIn = agents.find(
+      (a: { builtInAgentConfig?: { name: string } }) =>
+        a.builtInAgentConfig?.name === BUILT_IN_AGENT_IDS.SCHEDULE_CONVERSION,
+    );
+    expect(scheduleBuiltIn).toBeTruthy();
+    expect(scheduleBuiltIn.name).toBe(BUILT_IN_AGENT_NAMES.SCHEDULE_CONVERSION);
+    expect(scheduleBuiltIn.builtInAgentConfig).toEqual(
+      expect.objectContaining({
+        name: BUILT_IN_AGENT_IDS.SCHEDULE_CONVERSION,
+      }),
+    );
+
+    const deleteResponse = await app.inject({
+      method: "DELETE",
+      url: `/api/agents/${scheduleBuiltIn.id}`,
+    });
     expect(deleteResponse.statusCode).toBe(403);
   });
 

@@ -68,22 +68,6 @@ vi.mock("@/auth", () => ({
   hasAnyAgentTypeAdminPermission: mockHasAnyAgentTypeAdminPermission,
 }));
 
-vi.mock("@/database", () => ({
-  default: {
-    transaction: mockDbTransaction,
-  },
-  schema: {
-    scheduleTriggersTable: {
-      id: {},
-      organizationId: {},
-      linkedConversationId: {},
-    },
-    conversationsTable: {
-      id: {},
-    },
-  },
-}));
-
 vi.mock("@/utils/llm-resolution", () => ({
   resolveConversationLlmSelectionForAgent:
     mockResolveConversationLlmSelectionForAgent,
@@ -116,9 +100,7 @@ vi.mock("@/logging", () => ({
   },
 }));
 
-const mockNotifyConversationMessagesUpdated = vi.hoisted(() =>
-  vi.fn(),
-);
+const mockNotifyConversationMessagesUpdated = vi.hoisted(() => vi.fn());
 const mockNotifyScheduleTriggerRunUpdated = vi.hoisted(() => vi.fn());
 vi.mock("@/websocket", () => ({
   default: {
@@ -127,6 +109,7 @@ vi.mock("@/websocket", () => ({
   },
 }));
 
+import db from "@/database";
 import logger from "@/logging";
 import { handleScheduleTriggerRunExecution } from "./schedule-trigger-run-handler";
 
@@ -203,6 +186,11 @@ describe("handleScheduleTriggerRunExecution", () => {
     mockTxSelect.mockReset();
     mockTxInsert.mockReset();
     mockTxUpdate.mockReset();
+    mockResolveConversationLlmSelectionForAgent.mockResolvedValue({
+      selectedModel: "gpt-4o",
+      selectedProvider: "openai",
+      chatApiKeyId: null,
+    });
     mockDbTransaction.mockImplementation(async (fn: (tx: unknown) => unknown) =>
       fn({
         execute: mockTxExecute,
@@ -210,6 +198,9 @@ describe("handleScheduleTriggerRunExecution", () => {
         insert: mockTxInsert,
         update: mockTxUpdate,
       }),
+    );
+    vi.spyOn(db, "transaction").mockImplementation(
+      mockDbTransaction as typeof db.transaction,
     );
   });
 
@@ -269,13 +260,13 @@ describe("handleScheduleTriggerRunExecution", () => {
         source: "schedule-trigger",
       }),
     );
-    expect(mockAppendLinkedScheduleRunMessagesToConversation).toHaveBeenCalledWith(
-      {
-        conversationId: linkedId,
-        messageTemplate: "Run the task",
-        assistantText: "done",
-      },
-    );
+    expect(
+      mockAppendLinkedScheduleRunMessagesToConversation,
+    ).toHaveBeenCalledWith({
+      conversationId: linkedId,
+      messageTemplate: "Run the task",
+      assistantText: "done",
+    });
     expect(mockSetChatConversationId).toHaveBeenCalledWith("run-1", linkedId);
     expect(mockNotifyConversationMessagesUpdated).toHaveBeenCalledWith({
       conversationId: linkedId,
@@ -321,13 +312,13 @@ describe("handleScheduleTriggerRunExecution", () => {
     });
 
     expect(mockDbTransaction).toHaveBeenCalledTimes(1);
-    expect(mockAppendLinkedScheduleRunMessagesToConversation).toHaveBeenCalledWith(
-      {
-        conversationId: createdConversationId,
-        messageTemplate: "Run the task",
-        assistantText: "done",
-      },
-    );
+    expect(
+      mockAppendLinkedScheduleRunMessagesToConversation,
+    ).toHaveBeenCalledWith({
+      conversationId: createdConversationId,
+      messageTemplate: "Run the task",
+      assistantText: "done",
+    });
     expect(mockSetChatConversationId).toHaveBeenCalledWith(
       "run-1",
       createdConversationId,
@@ -480,7 +471,9 @@ describe("handleScheduleTriggerRunExecution", () => {
     });
 
     expect(mockExecuteA2AMessage).toHaveBeenCalled();
-    expect(mockAppendLinkedScheduleRunMessagesToConversation).not.toHaveBeenCalled();
+    expect(
+      mockAppendLinkedScheduleRunMessagesToConversation,
+    ).not.toHaveBeenCalled();
     expect(mockSetChatConversationId).not.toHaveBeenCalled();
     expect(mockNotifyConversationMessagesUpdated).not.toHaveBeenCalled();
     expect(mockTriggerUpdate).toHaveBeenCalledWith("trigger-1", {
@@ -510,7 +503,9 @@ describe("handleScheduleTriggerRunExecution", () => {
       triggerId: "trigger-1",
     });
 
-    expect(mockAppendLinkedScheduleRunMessagesToConversation).not.toHaveBeenCalled();
+    expect(
+      mockAppendLinkedScheduleRunMessagesToConversation,
+    ).not.toHaveBeenCalled();
     expect(mockRunMarkCompleted).toHaveBeenCalledWith({
       runId: "run-1",
       status: "success",

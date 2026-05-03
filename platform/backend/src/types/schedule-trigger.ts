@@ -7,6 +7,8 @@ import { z } from "zod";
 import { schema } from "@/database";
 import {
   createCron,
+  FORM_SHAPE_CRON_ERROR_MESSAGE,
+  isFormShapeCron,
   isValidTimezone,
   normalizeCronExpression,
   normalizeTimezone,
@@ -62,6 +64,7 @@ export const ScheduleTriggerSuggestionSchema = z.object({
   candidates: z.array(ScheduleTriggerSuggestionAgentCandidateSchema),
   reason: ScheduleTriggerSuggestionReasonSchema,
   suggestedName: z.string(),
+  suggestedMessageTemplate: z.string(),
   suggestedMessageTemplatePreview: z.string(),
 });
 
@@ -198,17 +201,27 @@ function validateScheduleTriggerFields(
     return;
   }
 
+  const normalizedCron = normalizeCronExpression(cronExpression);
+
   try {
-    const params = {
-      cronExpression: normalizeCronExpression(cronExpression),
+    createCron({
+      cronExpression: normalizedCron,
       timezone: normalizeTimezone(timezone),
-    };
-    createCron(params);
+    });
   } catch (error) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message:
         error instanceof Error ? error.message : "Invalid cron expression",
+      path: ["cronExpression"],
+    });
+    return;
+  }
+
+  if (!isFormShapeCron(normalizedCron)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: FORM_SHAPE_CRON_ERROR_MESSAGE,
       path: ["cronExpression"],
     });
   }

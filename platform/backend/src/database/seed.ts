@@ -8,6 +8,7 @@ import {
   PLAYWRIGHT_MCP_CATALOG_ID,
   PLAYWRIGHT_MCP_SERVER_NAME,
   POLICY_CONFIG_SYSTEM_PROMPT,
+  SCHEDULE_CONVERSION_SYSTEM_PROMPT,
   type PredefinedRoleName,
   type SupportedProvider,
   SupportedProviders,
@@ -98,6 +99,16 @@ export async function syncBuiltInAgents(): Promise<void> {
       systemPrompt: DUAL_LLM_QUARANTINE_SYSTEM_PROMPT,
       builtInAgentConfig: {
         name: BUILT_IN_AGENT_IDS.DUAL_LLM_QUARANTINE,
+      } as const,
+    },
+    {
+      builtInAgentId: BUILT_IN_AGENT_IDS.SCHEDULE_CONVERSION,
+      name: BUILT_IN_AGENT_NAMES.SCHEDULE_CONVERSION,
+      description:
+        "Built-in agent that summarizes chat transcripts into standalone prompts for recurring scheduled tasks",
+      systemPrompt: SCHEDULE_CONVERSION_SYSTEM_PROMPT,
+      builtInAgentConfig: {
+        name: BUILT_IN_AGENT_IDS.SCHEDULE_CONVERSION,
       } as const,
     },
   ];

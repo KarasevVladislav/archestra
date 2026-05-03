@@ -1,22 +1,19 @@
 "use client";
 
-import { Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { DEFAULT_SCHEDULE_TRIGGER_CRON_EXPRESSION } from "@/app/scheduled-tasks/schedule-trigger.utils";
 import {
-  ScheduleTriggerFormDialog,
   type ScheduleTriggerAgentOption,
+  ScheduleTriggerFormDialog,
 } from "@/components/scheduled-tasks/schedule-trigger-form-dialog";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { useProfiles } from "@/lib/agent.query";
 import {
   useConversationScheduleTriggerSuggestion,
   useCreateScheduleTriggerFromConversation,
 } from "@/lib/schedule-trigger.query";
-
-const DEFAULT_CRON_EXPRESSION = "0 9 * * 1-5";
 
 const REPLY_IN_SAME_HELP_TEXT =
   "Pick any agent that has already participated in this chat.";
@@ -33,9 +30,8 @@ export function ConvertToScheduledTaskDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const router = useRouter();
-  const { data: suggestion } = useConversationScheduleTriggerSuggestion(
-    open ? conversationId : null,
-  );
+  const { data: suggestion, isPending: suggestionPending } =
+    useConversationScheduleTriggerSuggestion(open ? conversationId : null);
   const { data: agents = [], isLoading: agentsLoading } = useProfiles({
     enabled: open,
     filters: { agentType: "agent" },
@@ -44,11 +40,12 @@ export function ConvertToScheduledTaskDialog({
 
   const [name, setName] = useState("");
   const [agentId, setAgentId] = useState("");
-  const [cronExpression, setCronExpression] = useState(DEFAULT_CRON_EXPRESSION);
+  const [cronExpression, setCronExpression] = useState(
+    DEFAULT_SCHEDULE_TRIGGER_CRON_EXPRESSION,
+  );
   const [timezone, setTimezone] = useState(
     Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
   );
-  const [useAiSummary, setUseAiSummary] = useState(true);
   const [messageTemplate, setMessageTemplate] = useState("");
   const [replyInSameConversation, setReplyInSameConversation] = useState(false);
   const [hydrated, setHydrated] = useState(false);
@@ -58,7 +55,6 @@ export function ConvertToScheduledTaskDialog({
   const previousOpenRef = useRef(open);
   const previousConversationIdRef = useRef(conversationId);
 
-  // Re-hydrate when the dialog is reused for a different conversation.
   useEffect(() => {
     if (previousConversationIdRef.current !== conversationId) {
       previousConversationIdRef.current = conversationId;
@@ -71,13 +67,20 @@ export function ConvertToScheduledTaskDialog({
       setHydrated(false);
       return;
     }
-    if (hydrated || !suggestion) return;
-    setName(suggestion.suggestedName ?? "");
-    if (suggestion.suggestedAgentId) {
-      setAgentId(suggestion.suggestedAgentId);
+    if (hydrated || suggestionPending) return;
+    if (suggestion) {
+      setName(suggestion.suggestedName ?? "");
+      if (suggestion.suggestedAgentId) {
+        setAgentId(suggestion.suggestedAgentId);
+      }
+      setMessageTemplate(
+        suggestion.suggestedMessageTemplate ??
+          suggestion.suggestedMessageTemplatePreview ??
+          "",
+      );
     }
     setHydrated(true);
-  }, [open, suggestion, hydrated]);
+  }, [open, suggestion, suggestionPending, hydrated]);
 
   const linkedAllowedAgentIds = useMemo(() => {
     const ids = new Set<string>();
@@ -116,9 +119,8 @@ export function ConvertToScheduledTaskDialog({
 
     setName("");
     setAgentId("");
-    setCronExpression(DEFAULT_CRON_EXPRESSION);
+    setCronExpression(DEFAULT_SCHEDULE_TRIGGER_CRON_EXPRESSION);
     setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
-    setUseAiSummary(true);
     setMessageTemplate("");
     setReplyInSameConversation(false);
     createMutationResetRef.current();
@@ -127,13 +129,14 @@ export function ConvertToScheduledTaskDialog({
   const trimmedName = name.trim();
   const trimmedTimezone = timezone.trim();
   const trimmedTemplate = messageTemplate.trim();
-  const isTemplateReady = useAiSummary || trimmedTemplate.length > 0;
+  const summaryReady = hydrated && !suggestionPending;
   const isFormValid =
     !!trimmedName &&
     !!agentId &&
     !!cronExpression.trim() &&
     !!trimmedTimezone &&
-    isTemplateReady;
+    summaryReady &&
+    trimmedTemplate.length > 0;
 
   const linkedAgentOptions = useMemo<ScheduleTriggerAgentOption[]>(() => {
     const seen = new Set<string>();
@@ -203,8 +206,8 @@ export function ConvertToScheduledTaskDialog({
       agentId,
       cronExpression: cronExpression.trim(),
       timezone: trimmedTimezone,
+      messageTemplate: trimmedTemplate,
       ...(replyInSameConversation ? { replyInSameConversation: true } : {}),
-      ...(useAiSummary ? {} : { messageTemplate: trimmedTemplate }),
     });
 
     if (created) {
@@ -243,6 +246,10 @@ export function ConvertToScheduledTaskDialog({
             : REPLY_IN_SAME_HELP_TEXT
           : undefined
       }
+      promptLabel="Summary"
+      promptDescription="Generated from this conversation. Edit before saving if needed."
+      promptLoading={open && suggestionPending}
+      promptPlaceholder="Write the prompt to send on each scheduled run."
       postEnabledSection={
         <div className="flex items-center justify-between rounded-md border p-3">
           <div>
@@ -259,42 +266,6 @@ export function ConvertToScheduledTaskDialog({
             onCheckedChange={setReplyInSameConversation}
           />
         </div>
-      }
-      promptHeaderExtra={
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-          <label className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Sparkles className="h-3 w-3" />
-            AI summary
-            <Switch checked={useAiSummary} onCheckedChange={setUseAiSummary} />
-          </label>
-        </div>
-      }
-      promptBody={
-        useAiSummary ? (
-          <div className="rounded-md border border-dashed bg-muted/30 p-3 text-xs text-muted-foreground space-y-1">
-            <p>
-              On save we'll summarize this conversation into a standalone prompt via
-              LLM.
-            </p>
-            {suggestion?.suggestedMessageTemplatePreview && (
-              <p className="line-clamp-3">
-                <span className="font-medium text-foreground">Preview: </span>
-                {suggestion.suggestedMessageTemplatePreview}
-              </p>
-            )}
-          </div>
-        ) : (
-          <Textarea
-            id="dialog-prompt"
-            value={messageTemplate}
-            onChange={(event) => setMessageTemplate(event.target.value)}
-            placeholder={
-              suggestion?.suggestedMessageTemplatePreview ||
-              "Write the exact prompt to send on every run."
-            }
-            className="min-h-[100px] resize-y"
-          />
-        )
       }
     />
   );

@@ -117,11 +117,18 @@ export async function executeA2AMessage(
   // key with the run id so parallel scheduled runs don't collide with each
   // other or with a concurrently-open user chat on the same conversation.
   const isDirectExecutionOutsideConversation = !params.conversationId;
-  const isolationKey = params.conversationId
-    ? params.scheduleTriggerRunId
-      ? `${params.conversationId}:run:${params.scheduleTriggerRunId}`
-      : params.conversationId
-    : crypto.randomUUID();
+
+  let isolationKey;
+  
+  if (params.conversationId) {
+    if (params.scheduleTriggerRunId) {
+      isolationKey = `${params.conversationId}:run:${params.scheduleTriggerRunId}`;
+    } else {
+      isolationKey = params.conversationId;
+    }
+  } else {
+    isolationKey = crypto.randomUUID();
+  }
 
   // Build delegation chain: append current agentId to parent chain
   const delegationChain = parentDelegationChain

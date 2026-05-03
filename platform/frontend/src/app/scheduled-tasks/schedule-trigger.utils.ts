@@ -7,6 +7,8 @@ export type AgentOption = {
   description: string;
 };
 
+export const DEFAULT_SCHEDULE_TRIGGER_CRON_EXPRESSION = "0 9 * * 1,2,3,4,5";
+
 export type ScheduleTriggerFormState = {
   name: string;
   agentId: string;
@@ -19,7 +21,7 @@ export type ScheduleTriggerFormState = {
 export const DEFAULT_FORM_STATE = (): ScheduleTriggerFormState => ({
   name: "",
   agentId: "",
-  cronExpression: "0 9 * * 1-5",
+  cronExpression: DEFAULT_SCHEDULE_TRIGGER_CRON_EXPRESSION,
   timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
   messageTemplate: "",
   keepResultsInSameChat: false,

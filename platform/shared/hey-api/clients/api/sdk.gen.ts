@@ -3617,7 +3617,7 @@ export const createScheduleTriggerFromConversation = <ThrowOnError extends boole
 });
 
 /**
- * Suggest defaults (agent, name, prompt preview) for converting a conversation into a scheduled task.
+ * Suggest defaults (agent, name, editable message template from conversation summary, first-message preview) for converting a conversation into a scheduled task.
  *
  * Authentication:
  *

@@ -18,6 +18,12 @@ import {
   ScheduleTriggerRunModel,
 } from "@/models";
 import { scheduleTriggerConverterService } from "@/schedule-triggers/converter";
+import {
+  createCron,
+  FORM_SHAPE_CRON_ERROR_MESSAGE,
+  isFormShapeCron,
+  isValidTimezone,
+} from "@/schedule-triggers/utils";
 import { ApiError } from "@/types";
 import { resolveConversationLlmSelectionForAgent } from "@/utils/llm-resolution";
 import {
@@ -75,9 +81,7 @@ const ConvertConversationToScheduledTaskOutputSchema = z.object({
     .describe("The ID of the created scheduled task (trigger)."),
   agent_id: z
     .string()
-    .describe(
-      "The ID of the agent that was selected for the scheduled task.",
-    ),
+    .describe("The ID of the agent that was selected for the scheduled task."),
   name: z.string().describe("The name of the created scheduled task."),
   cron_expression: z
     .string()
@@ -229,6 +233,7 @@ const registry = defineArchestraTools([
       }
     },
   }),
+
   defineArchestraTool({
     shortName: TOOL_CONVERT_CONVERSATION_TO_SCHEDULED_TASK_SHORT_NAME,
     title: "Convert Conversation to Scheduled Task",
@@ -236,7 +241,11 @@ const registry = defineArchestraTools([
       "Create a recurring scheduled task from the current conversation. The task will replay a standalone prompt (summarized from this chat unless one is provided) on the supplied cron schedule using an agent selected from this conversation's history. " +
       "Use this when the user explicitly asks to save, schedule, or re-run the current task periodically (e.g. 'do this every Monday at 9am', 'turn this into a recurring task'). " +
       "Prefer omitting agent_name and message_template to reuse the current conversation's context. Provide message_template only when the user wants to rewrite the prompt, and provide agent_name only when they pick a different agent. " +
-      "Timezone must be a valid IANA identifier (e.g. 'UTC', 'Europe/London'). Cron expression uses standard 5-field syntax.",
+      "Timezone must be a valid IANA identifier (e.g. 'UTC', 'Europe/London'). " +
+      "Cron expression must match one of the two forms supported by the in-app schedule form: " +
+      "(1) hourly 'M * * * *' (every hour at minute M, M=0-59), e.g. '0 * * * *'; " +
+      "(2) daily 'M H * * D' (every day at H:M), where D is '*' for every day or a comma-separated list of weekdays 0-6 (Sun=0, Mon=1, ..., Sat=6), e.g. '0 9 * * 1,2,3,4,5' for weekdays at 09:00. " +
+      "Bi-weekly, monthly, day-of-month, ranges (1-5), and step expressions (*/15) are NOT supported. If the user asks for a cadence that does not fit, pick the closest weekly equivalent or ask the user to clarify.",
     schema: z
       .object({
         cron_expression: z
@@ -244,7 +253,7 @@ const registry = defineArchestraTools([
           .trim()
           .min(1)
           .describe(
-            "Standard 5-field cron expression (minute hour day month weekday), e.g. '0 9 * * 1'.",
+            "5-field cron expression matching the in-app schedule form. Allowed forms: 'M * * * *' (hourly, M=0-59) or 'M H * * D' (daily, H=0-23, D='*' or comma-separated weekdays 0-6 with Sun=0). Examples: '0 * * * *', '0 9 * * *', '30 14 * * 1,2,3,4,5'. Day-of-month, month, ranges (1-5), and steps (*/15) are not supported.",
           ),
         timezone: z
           .string()
@@ -290,7 +299,40 @@ const registry = defineArchestraTools([
             "When true, each successful run appends the prompt and assistant reply to this conversation instead of an isolated run thread. If the conversation's agent later changes (e.g. swap_agent) and the scheduled task's agent is no longer valid for the chat, the task auto-unlinks from the conversation and continues as standalone runs.",
           ),
       })
-      .strict(),
+      .strict()
+      .superRefine((data, ctx) => {
+        if (!isValidTimezone(data.timezone)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Timezone must be a valid IANA timezone",
+            path: ["timezone"],
+          });
+          return;
+        }
+        try {
+          createCron({
+            cronExpression: data.cron_expression,
+            timezone: data.timezone,
+          });
+        } catch (error) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message:
+              error instanceof Error
+                ? error.message
+                : "Invalid cron expression",
+            path: ["cron_expression"],
+          });
+          return;
+        }
+        if (!isFormShapeCron(data.cron_expression)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: FORM_SHAPE_CRON_ERROR_MESSAGE,
+            path: ["cron_expression"],
+          });
+        }
+      }),
     outputSchema: ConvertConversationToScheduledTaskOutputSchema,
     async handler({ args, context }) {
       return handleConvertConversationToScheduledTask({ args, context });
@@ -625,11 +667,7 @@ async function handleConvertConversationToScheduledTask(params: {
   const { args, context } = params;
 
   try {
-    if (
-      !context.conversationId ||
-      !context.userId ||
-      !context.organizationId
-    ) {
+    if (!context.conversationId || !context.userId || !context.organizationId) {
       return errorResult(
         "This tool requires conversation context. It can only be used within an active chat conversation.",
       );
@@ -662,9 +700,7 @@ async function handleConvertConversationToScheduledTask(params: {
       );
 
       if (results.data.length === 0) {
-        return errorResult(
-          `No agent found matching "${args.agent_name}".`,
-        );
+        return errorResult(`No agent found matching "${args.agent_name}".`);
       }
 
       const targetAgent =
